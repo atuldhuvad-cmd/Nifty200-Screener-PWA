@@ -8,7 +8,7 @@ export type { IngestOutcome } from './ingest';
 export { ingestEnvelopeBytes } from './ingest';
 export { withMigrationLock } from './locks';
 export type { LockOutcome } from './locks';
-export { countPendingRuns, requestPersistentStorage } from './persistence';
+export { countAtRiskRuns, requestPersistentStorage } from './persistence';
 export type { PersistPromptResult } from './persistence';
 export {
   applyTransition,

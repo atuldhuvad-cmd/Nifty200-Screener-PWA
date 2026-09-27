@@ -536,3 +536,18 @@ While testing `withMigrationLock` (the Web Lock wrapper around schema migrations
 **Consequence:** the fallback path cannot be exercised by relying on the ambient test environment ("Web Locks aren't available under Node, so the fallback runs"). The storage tests (`tests/unit/storage-schema.test.ts`) instead stub `globalThis.navigator` explicitly for both cases — present and absent — so both branches of `withMigrationLock` are actually exercised, rather than only ever hitting whichever branch the ambient Node happens to support.
 
 No behavior or design change resulted from this; it only changed how the fallback is tested.
+
+---
+
+## 12. Step 3 review: quarantine scope and at-risk count amendment (2026-09-27)
+
+- **Amendment 2 (CSV-level rejection vs. envelope-level quarantine):** `quarantine_items` is reserved for **envelope-level** inputs only — a Drive-downloaded file, a backup-archive entry, or an internally-built envelope that fails post-build validation. It was already scoped this way in the Step 3 code (`ingestEnvelopeBytes` only ever operates on serialized *envelope* bytes, never on raw CSV bytes), so no code change was required here — this records the boundary explicitly as a rule Step 4 must follow.
+  - A user-selected **CSV** that fails preview-time validation (parse errors, the A2 limits, blocking header/identifier issues from `analyzeCsvBytes`) is **rejected at the preview step**: nothing is written to any store, and the user sees a clear, specific error. It never reaches `quarantine_items`, `ingestEnvelopeBytes`, or `commitNewRun`.
+- **Amendment 4 (at-risk run count):** `countPendingRuns` is renamed **`countAtRiskRuns`** and now counts every run with **no verified Drive copy right now**:
+  - `pending`, `local_only`, and `remote_missing` — unconditionally.
+  - `error` — **only** for a run that has never once synced successfully (`diagnostics.last_success_at === null`); an `error` run that previously synced still has a verified remote copy from before the failure, so it is excluded.
+  - `synced`, `conflict`, `quarantined`, `unsupported_schema`, and `syncing` are excluded (a `conflict`/`quarantined`/`unsupported_schema` run's remote-copy status is unresolved/not applicable, not itself "storage-eviction risk" in the sense this warning is about).
+- **Confirmed as implemented, no change needed:**
+  1. `INGEST_CONFLICT_VARIANT` / `QUARANTINE` transitions are reachable from any resolvable state, excluding `quarantined` and `unsupported_schema` themselves.
+  3. An `unsupported_schema` object with a `run_id` that collides with an existing run is quarantined rather than overwriting the existing record.
+  5. The comparison-identity index omits rows with neither a usable ISIN nor NSE Code.

@@ -16,9 +16,19 @@ export async function requestPersistentStorage(): Promise<PersistPromptResult> {
   return { supported: true, granted };
 }
 
-/** Count of `pending` runs — the ones storage-eviction risk actually applies to (already
- * `synced` runs are recoverable from Drive even if local storage is cleared). */
-export async function countPendingRuns(db: N200Database): Promise<number> {
+/**
+ * Count of runs with no verified Drive copy right now — the ones storage eviction actually
+ * puts at risk (§9 review, item 4): `pending`, `local_only`, and `remote_missing`
+ * unconditionally, plus `error` only for a run that has never once synced successfully
+ * (`last_success_at === null`) — an `error` run that previously synced still has a verified
+ * remote copy from before the failure. Already-`synced` runs are excluded outright.
+ */
+export async function countAtRiskRuns(db: N200Database): Promise<number> {
   const runs = await getAllRuns(db);
-  return runs.filter((r) => r.sync.state === 'pending').length;
+  return runs.filter((r) => {
+    const { state, diagnostics } = r.sync;
+    if (state === 'pending' || state === 'local_only' || state === 'remote_missing') return true;
+    if (state === 'error') return diagnostics.last_success_at === null;
+    return false;
+  }).length;
 }
