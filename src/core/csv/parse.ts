@@ -122,7 +122,7 @@ export function parseCsvBytes(bytes: Uint8Array): ParseOutcome {
   const errors: ImportError[] = [];
   if (headers.length > IMPORT_LIMITS.maxColumns) errors.push({ code: 'TOO_MANY_COLUMNS' });
   if (rows.length > IMPORT_LIMITS.maxDataRows) errors.push({ code: 'TOO_MANY_ROWS' });
-  if (rows.length === 0) errors.push({ code: 'NO_DATA_ROWS' });
+  // A header-only file (0 data rows) is allowed (§9 empty-run amendment); see analyzeCsvBytes.
 
   const tooLarge = findOversizedCell(records);
   if (tooLarge) {
@@ -132,7 +132,9 @@ export function parseCsvBytes(bytes: Uint8Array): ParseOutcome {
   if (errors.length > 0) return { ok: false, errors };
 
   const { style, finalNewline } = detectNewlineStyle(text);
-  const warnings: ImportWarning[] = style === 'mixed' ? [{ code: 'MIXED_LINE_ENDINGS' }] : [];
+  const warnings: ImportWarning[] = [];
+  if (style === 'mixed') warnings.push({ code: 'MIXED_LINE_ENDINGS' });
+  if (rows.length === 0) warnings.push({ code: 'EMPTY_RUN' });
 
   return {
     ok: true,

@@ -237,8 +237,12 @@ describe('parse: import limits (A2), generated SYNTHETIC inputs', () => {
     expect(parseCsvBytes(big)).toEqual({ ok: false, errors: [{ code: 'FILE_TOO_LARGE' }] });
   });
 
-  it('rejects a header-only file', () => {
-    expectParseError(enc('"a","b"\n'), 'NO_DATA_ROWS');
+  it('accepts a header-only file with an EMPTY_RUN warning, not an error (§9 amendment)', () => {
+    const out = parseCsvBytes(enc('"a","b"\n'));
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.value.rows).toEqual([]);
+    expect(out.warnings).toEqual([{ code: 'EMPTY_RUN' }]);
   });
 });
 

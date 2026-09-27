@@ -20,14 +20,21 @@ interface FieldDefinition {
   aliases: readonly string[];
 }
 
+/**
+ * `isin` and `nseCode` are NOT `required` here: their "missing" case is resolved jointly
+ * in `mapColumns` (§9 V2 amendment — block only when BOTH are missing). Ambiguity for
+ * either one still blocks individually, same as any other required field.
+ */
 export const FIELD_DEFINITIONS: Readonly<Record<FieldKey, FieldDefinition>> = {
   volumeNumerator: { required: true, aliases: ['consolidated end of day vol'] },
   volumeDenominator: { required: true, aliases: ['consolidated 30d average end of day vol'] },
-  isin: { required: true, aliases: ['isin'] },
-  nseCode: { required: true, aliases: ['nse code'] },
+  isin: { required: false, aliases: ['isin'] },
+  nseCode: { required: false, aliases: ['nse code'] },
   providerVolumeRatio: { required: false, aliases: ['volumeratio'] },
   serialNumber: { required: false, aliases: ['sl no'] },
 };
+
+const IDENTIFIER_FIELDS: readonly ['isin', 'nseCode'] = ['isin', 'nseCode'];
 
 export interface ColumnMapping {
   /** Column index per field; absent when missing or ambiguous. */
@@ -53,17 +60,31 @@ export function mapColumns(headers: readonly string[]): ColumnMapping {
     if (idx.length > 1) warnings.push({ code: 'DUPLICATE_HEADER', columns: idx });
   }
 
+  const identifierMissing = new Set<'isin' | 'nseCode'>();
+
   for (const [field, def] of Object.entries(FIELD_DEFINITIONS) as [FieldKey, FieldDefinition][]) {
     const matches = indicesWhere(keys, (k) => def.aliases.includes(k));
     const [only] = matches;
+    const isIdentifier = (IDENTIFIER_FIELDS as readonly FieldKey[]).includes(field);
+
     if (matches.length === 1 && only !== undefined) {
       columns[field] = only;
     } else if (matches.length === 0) {
-      if (def.required) errors.push({ code: 'REQUIRED_COLUMN_MISSING', field });
-    } else if (def.required) {
+      if (isIdentifier) identifierMissing.add(field as 'isin' | 'nseCode');
+      else if (def.required) errors.push({ code: 'REQUIRED_COLUMN_MISSING', field });
+    } else if (def.required || isIdentifier) {
+      // Ambiguity always blocks, even for the otherwise-relaxed identifier fields.
       errors.push({ code: 'REQUIRED_COLUMN_AMBIGUOUS', field, columns: matches });
     } else {
       warnings.push({ code: 'OPTIONAL_COLUMN_AMBIGUOUS', field, columns: matches });
+    }
+  }
+
+  if (identifierMissing.size === 2) {
+    errors.push({ code: 'IDENTIFIER_COLUMNS_BOTH_MISSING' });
+  } else {
+    for (const field of identifierMissing) {
+      warnings.push({ code: 'IDENTIFIER_COLUMN_MISSING', field });
     }
   }
 

@@ -13,12 +13,13 @@ export type ImportErrorCode =
   | 'CONTAINS_NUL'
   | 'CSV_SYNTAX'
   | 'ROW_WIDTH_MISMATCH'
-  | 'NO_DATA_ROWS'
   | 'TOO_MANY_ROWS'
   | 'TOO_MANY_COLUMNS'
   | 'CELL_TOO_LARGE'
   | 'REQUIRED_COLUMN_MISSING'
-  | 'REQUIRED_COLUMN_AMBIGUOUS';
+  | 'REQUIRED_COLUMN_AMBIGUOUS'
+  /** Both ISIN and NSE Code columns are missing (§9 V2 amendment: blocks only in this joint case). */
+  | 'IDENTIFIER_COLUMNS_BOTH_MISSING';
 
 export type FieldKey =
   | 'volumeNumerator'
@@ -50,7 +51,11 @@ export type ImportWarningCode =
   | 'PROVIDER_VOLUME_RATIO_MISMATCH'
   | 'DUPLICATE_ISIN_IN_RUN'
   | 'DUPLICATE_NSE_CODE_IN_RUN'
-  | 'ROWS_EXCLUDED_FROM_COMPARISON';
+  | 'ROWS_EXCLUDED_FROM_COMPARISON'
+  /** Exactly one of ISIN / NSE Code is present; matching falls back to whichever exists. */
+  | 'IDENTIFIER_COLUMN_MISSING'
+  /** §9 empty-run amendment: header-only CSV, allowed after explicit user confirmation. */
+  | 'EMPTY_RUN';
 
 export type PartialPageReason = 'row_count_page_size' | 'serial_number_not_starting_at_1';
 

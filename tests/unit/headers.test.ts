@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeCsvBytes } from '../../src/core/csv/analyze';
 import { FIELD_DEFINITIONS, mapColumns, normalizeHeaderKey } from '../../src/core/csv/headers';
-import { NBSP, synthetic, TAB } from '../helpers';
+import { buildCsv, NBSP, synthetic, TAB } from '../helpers';
 
 describe('normalizeHeaderKey (D3)', () => {
   it('trims and collapses space, tab and NBSP runs to one ASCII space', () => {
@@ -83,14 +83,72 @@ describe('mapColumns (D3 / V1 / V2)', () => {
     ]);
   });
 
-  it('blocks on each missing required field', () => {
+  it('blocks on each missing required field, plus the joint identifier-columns error', () => {
     const m = mapColumns(['Stock']);
-    expect(m.errors.map((e) => e.field)).toEqual([
-      'volumeNumerator',
-      'volumeDenominator',
-      'isin',
-      'nseCode',
+    expect(m.errors).toEqual([
+      { code: 'REQUIRED_COLUMN_MISSING', field: 'volumeNumerator' },
+      { code: 'REQUIRED_COLUMN_MISSING', field: 'volumeDenominator' },
+      { code: 'IDENTIFIER_COLUMNS_BOTH_MISSING' },
     ]);
+  });
+
+  describe('§9 V2 amendment: identifier columns block only when BOTH are missing', () => {
+    const withVolumeCols = [
+      'Consolidated end of day Vol',
+      'Consolidated 30D average end of day Vol',
+    ];
+
+    it('blocks with IDENTIFIER_COLUMNS_BOTH_MISSING when both ISIN and NSE Code are absent', () => {
+      const m = mapColumns(withVolumeCols);
+      expect(m.errors).toEqual([{ code: 'IDENTIFIER_COLUMNS_BOTH_MISSING' }]);
+    });
+
+    it('allows import with a non-blocking warning when only NSE Code is present', () => {
+      const m = mapColumns([...withVolumeCols, 'NSE Code']);
+      expect(m.errors).toEqual([]);
+      expect(m.columns.isin).toBeUndefined();
+      expect(m.columns.nseCode).toBe(2);
+      expect(m.warnings).toContainEqual({ code: 'IDENTIFIER_COLUMN_MISSING', field: 'isin' });
+    });
+
+    it('allows import with a non-blocking warning when only ISIN is present', () => {
+      const m = mapColumns([...withVolumeCols, 'ISIN']);
+      expect(m.errors).toEqual([]);
+      expect(m.columns.nseCode).toBeUndefined();
+      expect(m.columns.isin).toBe(2);
+      expect(m.warnings).toContainEqual({ code: 'IDENTIFIER_COLUMN_MISSING', field: 'nseCode' });
+    });
+
+    it('does not warn when both identifier columns are present', () => {
+      const m = mapColumns([...withVolumeCols, 'ISIN', 'NSE Code']);
+      expect(m.errors).toEqual([]);
+      expect(m.warnings.map((w) => w.code)).not.toContain('IDENTIFIER_COLUMN_MISSING');
+    });
+
+    it('still blocks on ambiguity for an identifier column, even though "missing" is relaxed', () => {
+      const m = mapColumns([...withVolumeCols, 'ISIN', 'isin ', 'NSE Code']);
+      expect(m.errors).toEqual([
+        { code: 'REQUIRED_COLUMN_AMBIGUOUS', field: 'isin', columns: [2, 3] },
+      ]);
+    });
+
+    it('matches using whichever identifier is present, under the existing identity rules', () => {
+      const a = analyzeCsvBytes(
+        buildCsv([
+          [...withVolumeCols, 'NSE Code'],
+          ['1500', '1000', 'SYNA'],
+        ]),
+      );
+      expect(a.ok && a.canConfirm).toBe(true);
+      if (!a.ok) return;
+      expect(a.rows[0]?.identity).toMatchObject({
+        raw_isin: '',
+        isin_validation: 'missing',
+        normalized_nse_code: 'SYNA',
+        nse_code_validation: 'valid',
+        match_method: 'nse_code_provisional',
+      });
+    });
   });
 
   it('warns but does not block on an ambiguous optional column, leaving it unmapped', () => {

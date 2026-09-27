@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeCsvBytes } from '../src/core/csv/analyze';
-import { synthetic } from './helpers';
+import { buildCsv, synthetic, SYNTHETIC_HEADER } from './helpers';
 
 describe('end-to-end analysis of SYNTHETIC format fixtures', () => {
   it('CRLF + BOM + final newline analyzes cleanly', () => {
@@ -24,6 +24,24 @@ describe('end-to-end analysis of SYNTHETIC format fixtures', () => {
       'Synthetic ' + String.fromCodePoint(0x1f4c8) + ' Chart Co',
     ]);
     expect(a.rows.map((r) => r.volumeRatio.value)).toEqual(['1.500', '1.000', '0.500', '0.250']);
+  });
+
+  it('§9 empty-run amendment: header-only CSV analyzes as an allowed, empty run', () => {
+    const a = analyzeCsvBytes(buildCsv([SYNTHETIC_HEADER]));
+    expect(a.ok).toBe(true);
+    if (!a.ok) return;
+    expect(a.canConfirm).toBe(true);
+    expect(a.blockingErrors).toEqual([]);
+    expect(a.rows).toEqual([]);
+    expect(a.parsed.rows).toEqual([]);
+    expect(a.warnings).toContainEqual({ code: 'EMPTY_RUN' });
+    // Stock count for an empty run is simply rows.length.
+    expect(a.rows.length).toBe(0);
+  });
+
+  it('an empty run does not spuriously trigger the page-size warning', () => {
+    const a = analyzeCsvBytes(buildCsv([SYNTHETIC_HEADER]));
+    expect(a.ok && a.warnings.map((w) => w.code)).not.toContain('POSSIBLE_PARTIAL_PAGE');
   });
 
   it.each([

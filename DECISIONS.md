@@ -478,3 +478,23 @@ These resolve the questions in §6.6 and §7.7. Where they conflict with earlier
   - The provider value never blocks, merges with, or substitutes for `volume_ratio_v1`.
 - **S3. Text cells:** display and sort keys use the D3 whitespace normalization (trim, then collapse). The raw cell stays unchanged.
 - **S4. Provider numeric columns** (for example `VolumeRatio`) that match the A3 grammar sort numerically. This affects sorting only.
+
+---
+
+## 9. Step 1 review: confirmations and required-field amendment (2026-09-27)
+
+- **V2 amendment (supersedes the V2 wording in §8):** required-identifier blocking is relaxed from "ISIN AND NSE Code both required" to **"block only when both ISIN and NSE Code columns are missing."**
+  - If exactly one of the two identifier columns is present, import is **allowed** with a **non-blocking warning**.
+  - Matching then uses whichever identifier is actually present, under the existing identity rules (ISIN preferred; NSE-Code-only is `nse_code_provisional`).
+  - The Volume Ratio numerator/denominator columns are **still both required** and still block confirmation if either is missing (V2's original rule, unchanged for those two fields).
+- **Empty-run amendment:** a CSV with a header row and **zero data rows** is no longer an error (`NO_DATA_ROWS` is removed as a blocking error).
+  - It is **allowed after explicit user confirmation** and is stored as an **empty run**, with a stock count of 0.
+  - It carries a **non-blocking warning** rather than being treated silently.
+- **Repository visibility:** acceptable for this repository to remain local-only for now. **Any future remote must be private, and adding one requires the owner's explicit authorization** — this is not implied by any earlier or later authorization in this document.
+- **Confirmed as implemented, no change needed:**
+  - Numeric-cell classification: only the empty string is `MISSING_*`; a whitespace-only or placeholder cell is `INVALID_*`.
+  - An invalid ISIN with a valid NSE Code falls back to `nse_code_provisional`, with a warning.
+  - `computeVolumeRatio` check order: numerator syntax → denominator syntax → numerator sign → denominator sign.
+  - The S2 mismatch warning rounds the exact quotient to 2 dp directly, not the already-rounded 3 dp value.
+  - UTF-16 and embedded-NUL files are rejected; mixed LF/CRLF is accepted with a warning; bare CR line endings are rejected.
+- **Toolchain confirmed:** TypeScript 6.0.3 (typescript-eslint does not yet support 7.x), npm with a committed lockfile (pnpm unavailable), `allowJs`+`checkJs` enabled (required by `svelte-check` for a script-less Svelte component), and S3/S4 deferred to the table UI step.
