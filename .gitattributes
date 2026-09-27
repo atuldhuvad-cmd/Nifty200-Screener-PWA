@@ -5,6 +5,7 @@ tests/fixtures/** -text
 # Source text normalized to LF in the repository.
 *.ts text eol=lf
 *.js text eol=lf
+*.mjs text eol=lf
 *.svelte text eol=lf
 *.json text eol=lf
 *.md text eol=lf

@@ -5,7 +5,8 @@ const WESTERN_GROUPED = /^-?[0-9]{1,3}(,[0-9]{3})+(\.[0-9]+)?$/;
 const INDIAN_GROUPED = /^-?[0-9]{1,2}(,[0-9]{2})*,[0-9]{3}(\.[0-9]+)?$/;
 const ZERO = /^-?0(\.0+)?$/;
 
-export type NumericDetail = 'grouping_comma';
+export const NUMERIC_DETAILS = ['grouping_comma'] as const;
+export type NumericDetail = (typeof NUMERIC_DETAILS)[number];
 
 export type NumericCell =
   | { kind: 'missing' }

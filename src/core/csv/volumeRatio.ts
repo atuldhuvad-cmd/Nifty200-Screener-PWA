@@ -4,13 +4,16 @@ import { parseNumericCell, type NumericDetail } from './numeric';
 export const VOLUME_RATIO_METRIC_VERSION = 'volume_ratio_v1';
 export const VOLUME_RATIO_SCALE = 3;
 
-export type VolumeRatioReason =
-  | 'MISSING_NUMERATOR'
-  | 'MISSING_DENOMINATOR'
-  | 'INVALID_NUMERATOR'
-  | 'INVALID_DENOMINATOR'
-  | 'NEGATIVE_NUMERATOR'
-  | 'NON_POSITIVE_DENOMINATOR';
+/** Single source of truth, also read by the envelope JSON Schema generator. */
+export const VOLUME_RATIO_REASONS = [
+  'MISSING_NUMERATOR',
+  'MISSING_DENOMINATOR',
+  'INVALID_NUMERATOR',
+  'INVALID_DENOMINATOR',
+  'NEGATIVE_NUMERATOR',
+  'NON_POSITIVE_DENOMINATOR',
+] as const;
+export type VolumeRatioReason = (typeof VOLUME_RATIO_REASONS)[number];
 
 export type VolumeRatioMetric =
   | {

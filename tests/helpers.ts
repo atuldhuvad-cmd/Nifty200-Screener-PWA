@@ -27,6 +27,11 @@ export function decisionsHashFor(sampleName: string): string {
   return hash;
 }
 
+export function withoutKey<T extends object, K extends keyof T>(obj: T, key: K): Omit<T, K> {
+  const entries = Object.entries(obj).filter(([k]) => k !== key);
+  return Object.fromEntries(entries) as Omit<T, K>;
+}
+
 export function sampleExists(name: string): boolean {
   return existsSync(join(SAMPLES_DIR, name));
 }
