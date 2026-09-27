@@ -1,0 +1,7 @@
+"Sl No","Stock","VolumeRatio","Day Vol ","Consolidated 30D average end of day Vol ","Consolidated end of day Vol ","NSE Code","BSE Code","ISIN"
+"1","Synthetic ""Quoted"" Co","1.00","1","1000","1000","SYNA","","ZZSYNTH00015"
+"2","Synthetic, Comma Ltd","1.00","1","1000","1000","SYNB","","ZZSYNTH00023"
+"3","Synthetic
+Multiline Ltd","1.00","1","1000","1000","SYNC","","ZZSYNTH00031"
+"4","Synthetic
+CRLF Inside Ltd","1.00","1","1000","1000","SYND","","ZZSYNTH00049"

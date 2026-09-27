@@ -1,0 +1,27 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# Real provider exports: not synthetic, never committed (global privacy rule; Trendlyne ToS unreviewed)
+samples/
+
+# Local/private data and secrets
+.env
+.env.*
+*.local
+*.pem
+*.key
+backups/
+exports/
+*.backup.json
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.log

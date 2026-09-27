@@ -1,0 +1,7 @@
+"Sl No","Stock","VolumeRatio","Day Vol ","Consolidated 30D average end of day Vol ","Consolidated end of day Vol ","NSE Code","BSE Code","ISIN"
+"1","Synthetic Match","1.50","1","1000","1500","SYNA","","ZZSYNTH00015"
+"2","Synthetic Mismatch","3.06","1","1000","991","SYNB","","ZZSYNTH00023"
+"3","Synthetic Provider Blank","","1","1000","1500","SYNC","","ZZSYNTH00031"
+"4","Synthetic One Decimal","1.5","1","1000","1500","SYND","","ZZSYNTH00049"
+"5","Synthetic Half Up","1.25","1","1000","1245","SYNE","","ZZSYNTH00056"
+"6","Synthetic Provider Text","n/a","1","1000","1500","SYNF","","ZZSYNTH00064"

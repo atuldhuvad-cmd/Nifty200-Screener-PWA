@@ -1,0 +1,32 @@
+# SYNTHETIC test fixtures
+
+**Everything in this folder is fabricated test data. None of it is real Trendlyne data, and it must never be presented as such (decision D10).**
+
+- **Company names:** every one is invented and starts with "Synthetic" (or a transliteration of it).
+- **ISINs:** every one uses the prefix `ZZ`, which is not a real ISO 3166 country code. Valid check digits were computed for the fabricated codes. `ZZSYNTH00010` is deliberately invalid.
+- **NSE codes** (`SYNA`, `SYN&CO`, …) are invented.
+- **Numbers** were chosen only to exercise parsing and rounding rules.
+- **Filenames:** every file starts with `SYNTHETIC_`.
+
+The files are byte-exact inputs. `.gitattributes` disables line-ending conversion for them, and Prettier ignores this folder. Expected outcomes live in the tests, not here.
+
+| File | Exercises |
+|---|---|
+| `SYNTHETIC_crlf_final_newline.csv` | BOM, CRLF line endings, final newline |
+| `SYNTHETIC_escaped_quotes_embedded.csv` | `""` escapes, an embedded comma, embedded LF and CRLF inside quoted fields |
+| `SYNTHETIC_unquoted_final_newline.csv` | Unquoted fields, no BOM, final LF |
+| `SYNTHETIC_mixed_line_endings.csv` | Mixed CRLF and LF (warning) |
+| `SYNTHETIC_blank_numerics.csv` | Blank, whitespace-only, `-` and `NA` numeric cells |
+| `SYNTHETIC_missing_identifiers.csv` | Missing, invalid and normalizable ISIN/NSE codes; duplicate ISIN; `&` and `-` symbols |
+| `SYNTHETIC_zero_and_negative_volume.csv` | Zero, `-0`, `-0.00`, negative numerator and denominator |
+| `SYNTHETIC_non_ascii_names.csv` | Non-ASCII names (Latin-1, Devanagari, ₹, 4-byte emoji); header whitespace and case variants |
+| `SYNTHETIC_grouping_commas.csv` | Western and Indian grouping commas, decimal comma, `+`, leading zeros, bare points, exponent |
+| `SYNTHETIC_rounding_boundaries.csv` | ROUND_HALF_UP at scale 3 (1.2344 / 1.2345 / 1.2346 and others) |
+| `SYNTHETIC_provider_mismatch.csv` | The S2 provider `VolumeRatio` comparison |
+| `SYNTHETIC_missing_numerator_column.csv` | V2: `Day Vol` and `NSE+BSE Vol` present, but no `Consolidated end of day Vol` |
+| `SYNTHETIC_ambiguous_numerator.csv` | Two headers normalizing to the numerator |
+| `SYNTHETIC_duplicate_blank_headers.csv` | Duplicate and blank headers are preserved, with warnings |
+| `SYNTHETIC_unclosed_quote.csv`, `SYNTHETIC_ragged_rows.csv`, `SYNTHETIC_bare_cr_line_endings.csv` | Syntax errors |
+| `SYNTHETIC_invalid_utf8.csv`, `SYNTHETIC_utf16le_bom.csv` | Encoding rejection |
+
+The oversized-input and page-size cases are generated inside the tests rather than stored here, to keep the repository small.

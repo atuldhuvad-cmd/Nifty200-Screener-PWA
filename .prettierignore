@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+package-lock.json
+samples/
+tests/fixtures/
+# Governing and hash-referenced documents must never be reformatted.
+*.md

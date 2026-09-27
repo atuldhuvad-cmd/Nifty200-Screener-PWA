@@ -1,0 +1,12 @@
+# CSV bytes are test inputs and hash-sensitive: never convert line endings.
+*.csv -text
+tests/fixtures/** -text
+
+# Source text normalized to LF in the repository.
+*.ts text eol=lf
+*.js text eol=lf
+*.svelte text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.html text eol=lf
+*.css text eol=lf
