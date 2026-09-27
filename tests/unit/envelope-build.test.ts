@@ -171,6 +171,37 @@ describe('buildEnvelope', () => {
     });
   });
 
+  describe('minLength:1 fields tolerate non-ASCII, including astral-plane, text', () => {
+    // The schema's only user-data minLength is on original_filename (parser_id/version/
+    // config_id are internal ASCII constants, never user text). Ajv is compiled with
+    // `unicode: false` (UTF-16-code-unit counting, not Unicode-code-point counting) purely
+    // to avoid a require()-based runtime helper (see scripts/compile-schema.mjs). For a
+    // *minimum* length of 1, code-unit vs code-point counting can never disagree: every
+    // non-empty string has at least 1 UTF-16 code unit, even a lone astral character (which
+    // is 2 code units, a surrogate pair). These tests prove that directly, and that an
+    // actually-empty filename is still correctly rejected.
+    it.each([
+      ['BMP non-ASCII', 'Nifty 200 – Fundamentals (सितंबर).csv'],
+      ['single astral-plane code point only', String.fromCodePoint(0x1f4c8)],
+      ['astral-plane surrogate pair plus extension', String.fromCodePoint(0x1f4c8) + '.csv'],
+    ])('%s: %j is accepted as original_filename', async (_label, filename) => {
+      const envelope = await buildFrom('SYNTHETIC_crlf_final_newline.csv', {
+        originalFilename: filename,
+      });
+      expect(envelope.original_filename).toBe(filename);
+      expect(validateSchema(envelope)).toBe(true);
+    });
+
+    it('an empty original_filename is still correctly rejected by the schema', async () => {
+      const envelope = await buildFrom('SYNTHETIC_crlf_final_newline.csv');
+      const outcome = { ...envelope, original_filename: '' };
+      expect(validateSchema(outcome)).toBe(false);
+      expect(validateSchema.errors?.some((e) => e.instancePath === '/original_filename')).toBe(
+        true,
+      );
+    });
+  });
+
   it('rejects building from a blocked (cannot-confirm) analysis', async () => {
     const bytes = synthetic('SYNTHETIC_missing_numerator_column.csv');
     const analysis = analyzeCsvBytes(bytes);

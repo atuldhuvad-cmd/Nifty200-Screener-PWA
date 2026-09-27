@@ -498,3 +498,41 @@ These resolve the questions in §6.6 and §7.7. Where they conflict with earlier
   - The S2 mismatch warning rounds the exact quotient to 2 dp directly, not the already-rounded 3 dp value.
   - UTF-16 and embedded-NUL files are rejected; mixed LF/CRLF is accepted with a warning; bare CR line endings are rejected.
 - **Toolchain confirmed:** TypeScript 6.0.3 (typescript-eslint does not yet support 7.x), npm with a committed lockfile (pnpm unavailable), `allowJs`+`checkJs` enabled (required by `svelte-check` for a script-less Svelte component), and S3/S4 deferred to the table UI step.
+
+---
+
+## 10. Pre-Step-3 check: minLength/maxLength vs. non-ASCII text (2026-09-27)
+
+**Checked:** `src/core/envelope/schema/envelope.v1.schema.json` for every use of `minLength`/`maxLength`.
+
+**Found:** `maxLength` is used nowhere. `minLength: 1` is used on exactly four fields:
+
+| Field | User-controlled text that can be non-ASCII? |
+|---|---|
+| `original_filename` | **Yes.** The user's actual CSV filename, which can contain any Unicode text. |
+| `parser.parser_id` | No — a fixed internal constant (`"csv-parse"`). |
+| `parser.parser_version` | No — a fixed internal constant (the pinned csv-parse version). |
+| `parser.config_id` | No — a fixed internal constant (`"n200-csv-v1"`). |
+
+No `minLength`/`maxLength` appears on `headers`, `rows` (stock names, including non-ASCII ones, live here), or `query_text` — none of these are length-constrained at all.
+
+**Risk assessed:** the generated validator is compiled with Ajv's `unicode: false` option (`scripts/compile-schema.mjs`), which makes `minLength`/`maxLength` count UTF-16 code units instead of Unicode code points. This was chosen only to avoid Ajv's `ucs2length` runtime helper, which the ESM standalone codegen emits as a `require(...)` call that breaks the CSP goal (report §2, D12). For a **minimum length of exactly 1**, code-unit counting and code-point counting can never disagree: every non-empty string has at least one UTF-16 code unit, including a lone astral-plane character (which is a 2-unit surrogate pair, still ≥ 1). **Conclusion: no bug.** The only field this could matter for, `original_filename`, is unaffected.
+
+**Outcome: kept the schema constraint as-is** (not removed), and added a test rather than relying on this reasoning alone: `tests/unit/envelope-build.test.ts`, describe block "minLength:1 fields tolerate non-ASCII, including astral-plane, text". It proves `original_filename` is accepted with:
+- ordinary BMP non-ASCII text (Devanagari, an en dash),
+- a filename that is a single astral-plane code point alone,
+- a single astral-plane code point plus an ASCII extension,
+
+and that a genuinely empty `original_filename` is still correctly rejected. All pass.
+
+**No schema change was needed.** If `maxLength` is ever added to any field in a future revision (none exists today), this reasoning would need re-deriving per-field, since a maximum is where code-unit vs. code-point counting actually can disagree.
+
+---
+
+## 11. Step 3 build note: Node 24 implements real Web Locks (2026-09-27)
+
+While testing `withMigrationLock` (the Web Lock wrapper around schema migrations, D-item "single-tab fallback when Web Locks are unavailable"), this project's Node runtime (v24.20.0) turned out to implement a real, working `navigator.locks.request()` — not just an empty `navigator` stub. This was unexpected going in.
+
+**Consequence:** the fallback path cannot be exercised by relying on the ambient test environment ("Web Locks aren't available under Node, so the fallback runs"). The storage tests (`tests/unit/storage-schema.test.ts`) instead stub `globalThis.navigator` explicitly for both cases — present and absent — so both branches of `withMigrationLock` are actually exercised, rather than only ever hitting whichever branch the ambient Node happens to support.
+
+No behavior or design change resulted from this; it only changed how the fallback is tested.
