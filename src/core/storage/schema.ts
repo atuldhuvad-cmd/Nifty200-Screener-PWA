@@ -20,6 +20,7 @@ export const STORE = {
 export const RUNS_BY_ORIGINAL_FILE_SHA256 = 'by_original_file_sha256';
 export const COMPARISON_BY_RUN_ID = 'by_run_id';
 export const COMPARISON_BY_IDENTITY_KEY = 'by_identity_key';
+export const COMPARISON_BY_NORMALIZED_NSE_CODE = 'by_normalized_nse_code';
 
 export interface N200DBSchema extends DBSchema {
   [STORE.runs]: {
@@ -41,6 +42,7 @@ export interface N200DBSchema extends DBSchema {
     indexes: {
       [COMPARISON_BY_RUN_ID]: string;
       [COMPARISON_BY_IDENTITY_KEY]: string;
+      [COMPARISON_BY_NORMALIZED_NSE_CODE]: string;
     };
   };
 }
@@ -58,15 +60,32 @@ export interface OpenDatabaseOptions {
   onReloadNeeded?: () => void;
   /** Fired when *this* open attempt is itself blocked by another tab's still-open older connection. */
   onBlocked?: () => void;
+  /**
+   * Fired when Web Locks were unavailable for this open, so the migration ran via the
+   * single-tab fallback (Bugbot P2-1) — never silently. The caller must disable any
+   * sync-triggering action (there is no such caller yet, since Drive sync doesn't exist in
+   * this app yet) and surface a single-active-tab warning to the user; see `singleTabWarning`
+   * on the result, which carries the same fact for callers that don't need a callback.
+   */
+  onSingleTabFallback?: () => void;
 }
 
-export async function openDatabase(options: OpenDatabaseOptions = {}): Promise<N200Database> {
+export interface OpenDatabaseResult {
+  db: N200Database;
+  /** Whether the schema migration actually ran under a real, cross-tab-coordinating Web Lock. */
+  usedLock: boolean;
+  /** `!usedLock` — Web Locks were unavailable, so only this tab's activity is coordinated.
+   * A future sync layer must check this and refuse to start concurrent sync while it's true. */
+  singleTabWarning: boolean;
+}
+
+export async function openDatabase(options: OpenDatabaseOptions = {}): Promise<OpenDatabaseResult> {
   // Holder populated once open, so the `blocking` handler below (which can only ever fire on
   // an already-open connection) always closes the right instance. A boxed field, not a `let`,
   // since only the box's contents change — the box itself is never reassigned.
   const holder: { db: N200Database | undefined } = { db: undefined };
 
-  const { result } = await withMigrationLock('n200-schema-migration', () =>
+  const { usedLock, result } = await withMigrationLock('n200-schema-migration', () =>
     openDB<N200DBSchema>(options.name ?? DB_NAME, DB_VERSION, {
       upgrade(database) {
         const runs = database.createObjectStore(STORE.runs, { keyPath: 'run_id' });
@@ -82,6 +101,7 @@ export async function openDatabase(options: OpenDatabaseOptions = {}): Promise<N
         });
         comparison.createIndex(COMPARISON_BY_RUN_ID, 'run_id');
         comparison.createIndex(COMPARISON_BY_IDENTITY_KEY, 'identity_key');
+        comparison.createIndex(COMPARISON_BY_NORMALIZED_NSE_CODE, 'normalized_nse_code');
       },
       blocked() {
         options.onBlocked?.();
@@ -93,5 +113,6 @@ export async function openDatabase(options: OpenDatabaseOptions = {}): Promise<N
     }),
   );
   holder.db = result;
-  return result;
+  if (!usedLock) options.onSingleTabFallback?.();
+  return { db: result, usedLock, singleTabWarning: !usedLock };
 }

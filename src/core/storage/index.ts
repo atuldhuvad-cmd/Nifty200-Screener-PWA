@@ -1,9 +1,11 @@
 export {
+  findIdentityConflicts,
   isinIdentityKey,
   nseIdentityKey,
   queryComparisonIndexByIdentity,
   rebuildComparisonIndexTx,
 } from './comparisonIndex';
+export type { IdentityConflictEntry, IdentityConflictGroup } from './comparisonIndex';
 export type { IngestOutcome } from './ingest';
 export { ingestEnvelopeBytes } from './ingest';
 export { withMigrationLock } from './locks';
@@ -28,12 +30,13 @@ export {
   RUNS_BY_ORIGINAL_FILE_SHA256,
   STORE,
 } from './schema';
-export type { N200Database, N200DBSchema, OpenDatabaseOptions } from './schema';
+export type { N200Database, N200DBSchema, OpenDatabaseOptions, OpenDatabaseResult } from './schema';
 export { SYNC_STATES, transition } from './syncState';
 export type { SyncEvent, SyncEventType, TransitionResult } from './syncState';
 export { initialSyncRecord } from './types';
 export type {
   ComparisonIdentityRecord,
+  QuarantineDiscoveryMetadata,
   QuarantineItemRecord,
   QuarantineSource,
   RunRecord,

@@ -5,22 +5,7 @@ import { rebuildComparisonIndexTx } from './comparisonIndex';
 import { RUNS_BY_ORIGINAL_FILE_SHA256, STORE, type N200Database } from './schema';
 import { transition, type SyncEvent } from './syncState';
 import { initialSyncRecord, type RunRecord, type SyncState } from './types';
-
-/**
- * Aborts `tx` if it is still active, and observes its `.done` rejection either way — so an
- * intentional abort never surfaces as an unhandled promise rejection. Safe to call on a
- * transaction IndexedDB has already auto-aborted itself (a failed request does this).
- */
-function safeAbort(tx: { abort(): void; done: Promise<void> }): void {
-  try {
-    tx.abort();
-  } catch {
-    // Already inactive/aborted.
-  }
-  tx.done.catch(() => {
-    // Expected: aborting rejects `.done`.
-  });
-}
+import { safeAbort } from './txUtils';
 
 export type CommitNewRunResult =
   | { ok: true; run_id: string }

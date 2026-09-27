@@ -7,7 +7,7 @@ import { buildTestEnvelope, freshDbName } from '../storage-helpers';
 let db: N200Database;
 
 beforeEach(async () => {
-  db = await openDatabase({ name: freshDbName() });
+  ({ db } = await openDatabase({ name: freshDbName() }));
 });
 
 afterEach(() => {

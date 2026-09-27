@@ -10,7 +10,7 @@ import { buildTestEnvelope, freshDbName } from '../storage-helpers';
 let db: N200Database;
 
 beforeEach(async () => {
-  db = await openDatabase({ name: freshDbName() });
+  ({ db } = await openDatabase({ name: freshDbName() }));
 });
 
 afterEach(() => {
@@ -176,5 +176,155 @@ describe('ingestEnvelopeBytes: unsupported_schema is preserved but excluded from
     const outcome = await ingestEnvelopeBytes(db, enc(future), 'drive');
     expect(outcome).toMatchObject({ kind: 'quarantined', reasons: ['RUN_ID_ALREADY_OCCUPIED'] });
     expect((await getRun(db, envelope.run_id))?.envelope).toEqual(envelope);
+  });
+});
+
+async function divergentEnvelopeWithQueryText(
+  canonical: RunEnvelopeV1,
+  queryText: string,
+): Promise<RunEnvelopeV1> {
+  const { jcsSha256Hex } = await import('../../src/core/envelope/canonicalHash');
+  const rest = withoutKey({ ...canonical, query_text: queryText }, 'envelope_sha256');
+  const hash = await jcsSha256Hex(rest);
+  return { ...rest, envelope_sha256: hash };
+}
+
+describe('Bugbot P1-1: conflict routing is one atomic transaction', () => {
+  it('concurrent ingestion of two different divergent envelopes loses no variant', async () => {
+    const canonical = await buildTestEnvelope();
+    await commitNewRun(db, canonical);
+    const divergentA = await divergentEnvelopeWithQueryText(canonical, 'query A');
+    const divergentB = await divergentEnvelopeWithQueryText(canonical, 'query B');
+    expect(divergentA.envelope_sha256).not.toBe(divergentB.envelope_sha256);
+
+    const [outcomeA, outcomeB] = await Promise.all([
+      ingestEnvelopeBytes(db, enc(divergentA), 'backup_import'),
+      ingestEnvelopeBytes(db, enc(divergentB), 'drive'),
+    ]);
+    expect(outcomeA).toEqual({ kind: 'conflict', run_id: canonical.run_id });
+    expect(outcomeB).toEqual({ kind: 'conflict', run_id: canonical.run_id });
+
+    const variantA = await db.get(STORE.runVariants, [
+      canonical.run_id,
+      divergentA.envelope_sha256,
+    ]);
+    const variantB = await db.get(STORE.runVariants, [
+      canonical.run_id,
+      divergentB.envelope_sha256,
+    ]);
+    expect(variantA?.envelope).toEqual(divergentA);
+    expect(variantB?.envelope).toEqual(divergentB);
+
+    const canonicalRecord = await getRun(db, canonical.run_id);
+    expect(canonicalRecord?.envelope).toEqual(canonical); // still untouched
+    expect(canonicalRecord?.sync.state).toBe('conflict');
+  });
+
+  it('re-ingesting an already-stored variant is an idempotent no-op, not a ConstraintError', async () => {
+    const canonical = await buildTestEnvelope();
+    await commitNewRun(db, canonical);
+    const divergent = await divergentEnvelopeWithQueryText(canonical, 'same query');
+
+    const first = await ingestEnvelopeBytes(db, enc(divergent), 'backup_import');
+    expect(first).toEqual({ kind: 'conflict', run_id: canonical.run_id });
+
+    // Re-ingesting the identical bytes must not throw, and must not duplicate the variant.
+    const second = await ingestEnvelopeBytes(db, enc(divergent), 'backup_import');
+    expect(second).toEqual({ kind: 'conflict', run_id: canonical.run_id });
+
+    const allVariants = await db.getAll(STORE.runVariants);
+    const matching = allVariants.filter(
+      (v) => v.run_id === canonical.run_id && v.envelope_sha256 === divergent.envelope_sha256,
+    );
+    expect(matching).toHaveLength(1);
+  });
+
+  it('a simulated mid-transaction failure leaves neither an orphan variant nor an unmarked canonical run', async () => {
+    const canonical = await buildTestEnvelope();
+    await commitNewRun(db, canonical);
+    const divergent = await divergentEnvelopeWithQueryText(canonical, 'boom query');
+
+    // Force the transaction's *second* write (the canonical run's sync-state update, which
+    // ingest.ts issues via `put`) to fail after its *first* write (the variant `add`) has
+    // already been issued, simulating a mid-transaction fault. IndexedDB aborts the whole
+    // transaction on any failed request, so if ingest.ts genuinely does this in one
+    // transaction, the variant write must roll back too. `commitNewRun` (used above to seed
+    // `canonical`) only ever uses `add`, so this is the first real `put` call in the test.
+    const originalPut = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function patchedPut(this: IDBObjectStore): IDBRequest {
+      IDBObjectStore.prototype.put = originalPut;
+      throw new DOMException('Simulated mid-transaction failure', 'UnknownError');
+    };
+
+    try {
+      await expect(ingestEnvelopeBytes(db, enc(divergent), 'backup_import')).rejects.toThrow();
+    } finally {
+      IDBObjectStore.prototype.put = originalPut;
+    }
+
+    const variant = await db.get(STORE.runVariants, [canonical.run_id, divergent.envelope_sha256]);
+    expect(variant).toBeUndefined(); // no orphan variant
+
+    const canonicalRecord = await getRun(db, canonical.run_id);
+    expect(canonicalRecord?.sync.state).toBe('pending'); // never left half-marked
+    expect(canonicalRecord?.envelope).toEqual(canonical);
+  });
+});
+
+describe('Bugbot P2-5: structured, non-authoritative discovery metadata on quarantine items', () => {
+  it('preserves discovery metadata passed to ingestEnvelopeBytes on the stored quarantine item', async () => {
+    const outcome = await ingestEnvelopeBytes(db, new TextEncoder().encode('not json'), 'drive', {
+      drive_file_id: 'file-abc123',
+      drive_app_properties: { app: 'n200-screener', run_id: 'whatever-the-file-claimed' },
+      detection_context: 'periodic Drive folder scan',
+    });
+    expect(outcome.kind).toBe('quarantined');
+    if (outcome.kind !== 'quarantined') return;
+
+    const item = await db.get(STORE.quarantineItems, outcome.quarantine_id);
+    expect(item?.discovery_metadata).toEqual({
+      drive_file_id: 'file-abc123',
+      drive_app_properties: { app: 'n200-screener', run_id: 'whatever-the-file-claimed' },
+      detection_context: 'periodic Drive folder scan',
+    });
+  });
+
+  it('preserves backup-entry discovery metadata', async () => {
+    const outcome = await ingestEnvelopeBytes(
+      db,
+      new TextEncoder().encode('not json'),
+      'backup_import',
+      {
+        backup_entry_name: 'run-0042.json',
+        backup_entry_index: 42,
+      },
+    );
+    expect(outcome.kind).toBe('quarantined');
+    if (outcome.kind !== 'quarantined') return;
+    const item = await db.get(STORE.quarantineItems, outcome.quarantine_id);
+    expect(item?.discovery_metadata).toEqual({
+      backup_entry_name: 'run-0042.json',
+      backup_entry_index: 42,
+    });
+  });
+
+  it('omits discovery_metadata entirely when none is supplied, rather than storing an empty object', async () => {
+    const outcome = await ingestEnvelopeBytes(
+      db,
+      new TextEncoder().encode('not json'),
+      'local_import',
+    );
+    expect(outcome.kind).toBe('quarantined');
+    if (outcome.kind !== 'quarantined') return;
+    const item = await db.get(STORE.quarantineItems, outcome.quarantine_id);
+    expect('discovery_metadata' in (item ?? {})).toBe(false);
+  });
+
+  it('discovery metadata is never trusted for routing: a claimed run_id in appProperties does not affect where a malformed item lands', async () => {
+    const outcome = await ingestEnvelopeBytes(db, new TextEncoder().encode('garbage'), 'drive', {
+      drive_app_properties: { run_id: 'some-other-run-id-entirely' },
+    });
+    expect(outcome).toMatchObject({ kind: 'quarantined', reasons: ['JSON_PARSE_FAILED'] });
+    expect(await db.get(STORE.runs, 'some-other-run-id-entirely')).toBeUndefined();
   });
 });

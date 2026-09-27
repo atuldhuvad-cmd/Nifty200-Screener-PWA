@@ -15,13 +15,14 @@ import {
   STORE,
   type N200Database,
 } from '../../src/core/storage/schema';
+import { initialSyncRecord } from '../../src/core/storage/types';
 import { buildCsv, SYNTHETIC_HEADER } from '../helpers';
 import { buildTestEnvelope, freshDbName } from '../storage-helpers';
 
 let db: N200Database;
 
 beforeEach(async () => {
-  db = await openDatabase({ name: freshDbName() });
+  ({ db } = await openDatabase({ name: freshDbName() }));
 });
 
 afterEach(() => {
@@ -125,17 +126,7 @@ describe('atomic import: rollback on a simulated mid-transaction failure', () =>
     await db.add(STORE.runs, {
       run_id: envelope.run_id,
       envelope,
-      sync: {
-        state: 'pending',
-        prior_stable_state: null,
-        diagnostics: {
-          last_attempt_at: null,
-          last_success_at: null,
-          attempt_count: 0,
-          error_code: null,
-          retryable: null,
-        },
-      },
+      sync: initialSyncRecord('pending'),
     });
 
     const result = await commitNewRun(db, envelope);

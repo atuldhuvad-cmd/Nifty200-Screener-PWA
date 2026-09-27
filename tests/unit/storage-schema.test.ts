@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   COMPARISON_BY_IDENTITY_KEY,
+  COMPARISON_BY_NORMALIZED_NSE_CODE,
   COMPARISON_BY_RUN_ID,
   DB_VERSION,
   openDatabase,
@@ -12,7 +13,7 @@ import { freshDbName } from '../storage-helpers';
 
 describe('openDatabase: schema creation', () => {
   it('creates all four stores with the expected key paths and indexes', async () => {
-    const db = await openDatabase({ name: freshDbName() });
+    const { db } = await openDatabase({ name: freshDbName() });
     try {
       expect(Array.from(db.objectStoreNames).sort()).toEqual(
         [STORE.runs, STORE.runVariants, STORE.quarantineItems, STORE.comparisonIdentity].sort(),
@@ -36,7 +37,11 @@ describe('openDatabase: schema creation', () => {
       expect(tx.objectStore(STORE.comparisonIdentity).keyPath).toBe('id');
       expect(tx.objectStore(STORE.comparisonIdentity).autoIncrement).toBe(true);
       expect(Array.from(tx.objectStore(STORE.comparisonIdentity).indexNames).sort()).toEqual(
-        [COMPARISON_BY_RUN_ID, COMPARISON_BY_IDENTITY_KEY].sort(),
+        [
+          COMPARISON_BY_RUN_ID,
+          COMPARISON_BY_IDENTITY_KEY,
+          COMPARISON_BY_NORMALIZED_NSE_CODE,
+        ].sort(),
       );
       await tx.done;
     } finally {
@@ -46,9 +51,9 @@ describe('openDatabase: schema creation', () => {
 
   it('is idempotent: opening the same name/version twice reuses the existing schema without error', async () => {
     const name = freshDbName();
-    const db1 = await openDatabase({ name });
+    const { db: db1 } = await openDatabase({ name });
     db1.close();
-    const db2 = await openDatabase({ name });
+    const { db: db2 } = await openDatabase({ name });
     try {
       expect(Array.from(db2.objectStoreNames)).toHaveLength(4);
     } finally {
@@ -61,7 +66,10 @@ describe('openDatabase: versionchange / blocked handling', () => {
   it('an open connection closes itself and signals reload when another tab requests a newer version ("blocking")', async () => {
     const name = freshDbName();
     let reloadSignalled = false;
-    const first = await openDatabase({ name, onReloadNeeded: () => (reloadSignalled = true) });
+    const { db: first } = await openDatabase({
+      name,
+      onReloadNeeded: () => (reloadSignalled = true),
+    });
 
     // Simulate "another tab" opening a newer version while `first` is still open.
     const { openDB } = await import('idb');
@@ -167,16 +175,50 @@ describe('withMigrationLock: single-tab fallback when Web Locks are unavailable'
     expect(outcome).toEqual({ usedLock: true, result: 'ok' });
     expect(calls).toEqual(['n200-schema-migration']);
   });
+});
 
-  it('openDatabase itself succeeds via the single-tab fallback when Web Locks are unavailable', async () => {
-    const db = await withStubbedNavigator({}, () => openDatabase({ name: freshDbName() }));
-    expect(Array.from(db.objectStoreNames)).toHaveLength(4);
-    db.close();
+describe('Bugbot P2-1: openDatabase surfaces usedLock and a single-active-tab warning', () => {
+  it('reports usedLock: true, singleTabWarning: false, and never fires onSingleTabFallback when Web Locks are available', async () => {
+    let fallbackFired = false;
+    const { db, usedLock, singleTabWarning } = await openDatabase({
+      name: freshDbName(),
+      onSingleTabFallback: () => (fallbackFired = true),
+    });
+    try {
+      expect(usedLock).toBe(true);
+      expect(singleTabWarning).toBe(false);
+      expect(fallbackFired).toBe(false);
+    } finally {
+      db.close();
+    }
   });
 
-  it('openDatabase also succeeds when Web Locks are available (uses the real lock)', async () => {
-    const db = await openDatabase({ name: freshDbName() });
-    expect(Array.from(db.objectStoreNames)).toHaveLength(4);
-    db.close();
+  it('reports usedLock: false, singleTabWarning: true, and fires onSingleTabFallback when Web Locks are unavailable — never silently', async () => {
+    let fallbackFired = false;
+    const { db, usedLock, singleTabWarning } = await withStubbedNavigator({}, () =>
+      openDatabase({
+        name: freshDbName(),
+        onSingleTabFallback: () => (fallbackFired = true),
+      }),
+    );
+    try {
+      expect(usedLock).toBe(false);
+      expect(singleTabWarning).toBe(true);
+      expect(fallbackFired).toBe(true);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('the single-tab fallback still opens a fully usable database — only the warning/lock status differs', async () => {
+    const { db, singleTabWarning } = await withStubbedNavigator({}, () =>
+      openDatabase({ name: freshDbName() }),
+    );
+    try {
+      expect(singleTabWarning).toBe(true);
+      expect(Array.from(db.objectStoreNames)).toHaveLength(4);
+    } finally {
+      db.close();
+    }
   });
 });

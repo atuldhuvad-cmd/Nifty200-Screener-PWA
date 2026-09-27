@@ -23,6 +23,14 @@ export interface SyncDiagnostics {
   attempt_count: number;
   error_code: string | null;
   retryable: boolean | null;
+  /**
+   * Explicit, current-moment fact: is there a Drive copy verified to match this run's content
+   * right now? (Bugbot P2-3 — not inferred from `last_success_at`, which only says a sync ever
+   * succeeded, not whether that copy is still valid.) True only immediately after
+   * `SYNC_SUCCEEDED`; a later `REMOTE_MISSING_DETECTED` or a divergent-variant conflict clears
+   * it back to false, even though the run did once sync successfully.
+   */
+  has_verified_remote_copy: boolean;
 }
 
 export interface SyncRecord {
@@ -47,6 +55,7 @@ export function initialSyncRecord(state: SyncState = 'pending'): SyncRecord {
       attempt_count: 0,
       error_code: null,
       retryable: null,
+      has_verified_remote_copy: false,
     },
   };
 }
@@ -79,6 +88,26 @@ export interface RunVariantRecord {
 
 export type QuarantineSource = 'drive' | 'backup_import' | 'local_import';
 
+/**
+ * Structured provenance for a quarantined item, recorded for operator diagnosis only.
+ * (Bugbot P2-5.) Every field is **non-authoritative discovery metadata** — exactly like the
+ * brief's treatment of Drive `appProperties`: "discovery hints only, never trusted content."
+ * Nothing here is ever used to route, validate, or re-classify the item; it is preserved
+ * purely so a human reviewing `quarantine_items` can tell where a bad item came from.
+ */
+export interface QuarantineDiscoveryMetadata {
+  /** Drive file id, when `source === 'drive'`. Never trusted; see brief on appProperties. */
+  drive_file_id?: string;
+  /** The file's own (also-untrusted) appProperties tags, when available. */
+  drive_app_properties?: Record<string, string>;
+  /** The backup archive/manifest entry's own name, when `source === 'backup_import'`. */
+  backup_entry_name?: string;
+  /** The entry's position within the backup manifest's ordered run-ID list. */
+  backup_entry_index?: number;
+  /** Free-text note on how/where this item was found (e.g. which scan or restore attempt). */
+  detection_context?: string;
+}
+
 export interface QuarantineItemRecord {
   quarantine_id: string;
   original_bytes: Uint8Array;
@@ -86,6 +115,7 @@ export interface QuarantineItemRecord {
   observed_sha256: string;
   validation_errors: string[];
   discovered_at: string;
+  discovery_metadata?: QuarantineDiscoveryMetadata;
 }
 
 /**
@@ -100,4 +130,13 @@ export interface ComparisonIdentityRecord {
   match_method: 'isin' | 'nse_code_provisional';
   /** `isin:<normalized_isin>` or `nse:<normalized_nse_code>` — namespaced so the two never collide. */
   identity_key: string;
+  /**
+   * Both identifiers are stored on every row (Bugbot P2-2), regardless of which one
+   * `match_method`/`identity_key` are keyed on, so a "same NSE Code, different ISIN" conflict
+   * (brief: "conflict; do not auto-merge, surface for review") can be detected across rows
+   * without re-deriving identity from the envelope each time. ISIN remains primary for
+   * matching — these fields are for conflict detection only.
+   */
+  normalized_isin: string | null;
+  normalized_nse_code: string | null;
 }

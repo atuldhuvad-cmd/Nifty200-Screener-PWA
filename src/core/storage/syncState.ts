@@ -53,6 +53,21 @@ function isSyncState(x: unknown): x is SyncState {
   return typeof x === 'string' && (SYNC_STATES as readonly string[]).includes(x);
 }
 
+function restorePriorState(
+  from: SyncState,
+  eventType: SyncEventType,
+  priorStableState: SyncState | null,
+):
+  | { ok: true; state: SyncState }
+  | { ok: false; reason: 'invalid_transition'; from: SyncState; event: SyncEventType } {
+  if (!isSyncState(priorStableState)) {
+    // Structurally unreachable (START_SYNC always sets it before syncing is entered), but
+    // guarded rather than asserted so a corrupted record can never silently misroute.
+    return { ok: false, reason: 'invalid_transition', from, event: eventType };
+  }
+  return { ok: true, state: priorStableState };
+}
+
 /**
  * Pure: computes the next SyncRecord for one event, or reports the event as invalid from the
  * current state. Never mutates its input. The 9-state set and every edge here are drawn
@@ -87,6 +102,7 @@ export function transition(current: SyncRecord, event: SyncEvent): TransitionRes
       diagnostics.last_success_at = nowIso();
       diagnostics.error_code = null;
       diagnostics.retryable = null;
+      diagnostics.has_verified_remote_copy = true;
       break;
     }
     case 'SYNC_FAILED': {
@@ -94,30 +110,41 @@ export function transition(current: SyncRecord, event: SyncEvent): TransitionRes
       priorStableState = null;
       diagnostics.error_code = event.errorCode;
       diagnostics.retryable = event.retryable;
+      // A failed *attempt* says nothing about a copy verified before this attempt started.
       break;
     }
-    case 'SYNC_CANCELLED':
-    case 'SYNC_TIMEOUT': {
-      // "Never leave a run stuck in syncing" / "Never convert every timed-out operation to
-      // pending" — restore whatever stable state preceded this attempt.
-      if (!isSyncState(priorStableState)) {
-        // Structurally unreachable (START_SYNC always sets it before syncing is entered), but
-        // guarded rather than asserted so a corrupted record can never silently misroute.
-        return { ok: false, reason: 'invalid_transition', from, event: event.type };
-      }
-      nextState = priorStableState;
+    case 'SYNC_CANCELLED': {
+      // User-initiated, not a failure: restore the prior stable state with no error recorded
+      // ("Never leave a run stuck in syncing").
+      const restored = restorePriorState(from, event.type, priorStableState);
+      if (!restored.ok) return restored;
+      nextState = restored.state;
       priorStableState = null;
+      break;
+    }
+    case 'SYNC_TIMEOUT': {
+      // Also restores the prior stable state ("Never convert every timed-out operation to
+      // pending"), but unlike cancellation this genuinely didn't complete — record a stable,
+      // retryable diagnostic (Bugbot P2-4) so it's distinguishable from a clean cancellation.
+      const restored = restorePriorState(from, event.type, priorStableState);
+      if (!restored.ok) return restored;
+      nextState = restored.state;
+      priorStableState = null;
+      diagnostics.error_code = 'SYNC_TIMEOUT';
+      diagnostics.retryable = true;
       break;
     }
     case 'REMOTE_MISSING_DETECTED': {
       nextState = 'remote_missing';
       priorStableState = null;
+      diagnostics.has_verified_remote_copy = false;
       break;
     }
     case 'REMOTE_CONFLICT_DETECTED':
     case 'INGEST_CONFLICT_VARIANT': {
       nextState = 'conflict';
       priorStableState = null;
+      diagnostics.has_verified_remote_copy = false;
       break;
     }
     case 'KEEP_LOCAL_ONLY': {

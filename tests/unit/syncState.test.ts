@@ -231,3 +231,73 @@ describe('transition(): specific resulting states and diagnostics', () => {
     expect(before).toEqual(snapshot);
   });
 });
+
+describe('Bugbot P2-4: SYNC_TIMEOUT records a stable error diagnostic; SYNC_CANCELLED does not', () => {
+  it('SYNC_TIMEOUT restores the prior state AND records a stable timeout error code with retryable: true', () => {
+    const result = transition(recordAt('syncing', 'pending'), { type: 'SYNC_TIMEOUT' });
+    expect(result.ok && result.record.state).toBe('pending');
+    expect(result.ok && result.record.diagnostics.error_code).toBe('SYNC_TIMEOUT');
+    expect(result.ok && result.record.diagnostics.retryable).toBe(true);
+  });
+
+  it('SYNC_CANCELLED restores the prior state with NO error diagnostic (user-initiated, not a failure)', () => {
+    const result = transition(recordAt('syncing', 'pending'), { type: 'SYNC_CANCELLED' });
+    expect(result.ok && result.record.state).toBe('pending');
+    expect(result.ok && result.record.diagnostics.error_code).toBeNull();
+    expect(result.ok && result.record.diagnostics.retryable).toBeNull();
+  });
+
+  it('the timeout error code is distinguishable from a SYNC_FAILED error code', () => {
+    const timedOut = transition(recordAt('syncing', 'synced'), { type: 'SYNC_TIMEOUT' });
+    const failed = transition(recordAt('syncing', 'synced'), {
+      type: 'SYNC_FAILED',
+      errorCode: 'NETWORK',
+      retryable: true,
+    });
+    expect(timedOut.ok && timedOut.record.diagnostics.error_code).not.toBe(
+      failed.ok && failed.record.diagnostics.error_code,
+    );
+  });
+});
+
+describe('Bugbot P2-3: has_verified_remote_copy is tracked explicitly', () => {
+  it('starts false on a brand-new sync record', () => {
+    expect(initialSyncRecord().diagnostics.has_verified_remote_copy).toBe(false);
+  });
+
+  it('becomes true only on SYNC_SUCCEEDED', () => {
+    const result = transition(recordAt('syncing', 'pending'), { type: 'SYNC_SUCCEEDED' });
+    expect(result.ok && result.record.diagnostics.has_verified_remote_copy).toBe(true);
+  });
+
+  it('becomes false again when the remote copy is found missing', () => {
+    const synced: SyncRecord = {
+      ...recordAt('synced'),
+      diagnostics: { ...initialSyncRecord().diagnostics, has_verified_remote_copy: true },
+    };
+    const result = transition(synced, { type: 'REMOTE_MISSING_DETECTED' });
+    expect(result.ok && result.record.diagnostics.has_verified_remote_copy).toBe(false);
+  });
+
+  it('becomes false when a divergent variant is discovered (conflict) even though it was previously synced', () => {
+    const synced: SyncRecord = {
+      ...recordAt('synced'),
+      diagnostics: { ...initialSyncRecord().diagnostics, has_verified_remote_copy: true },
+    };
+    const result = transition(synced, { type: 'INGEST_CONFLICT_VARIANT' });
+    expect(result.ok && result.record.diagnostics.has_verified_remote_copy).toBe(false);
+  });
+
+  it('is unaffected by a failed sync attempt (a prior verified copy still exists from before the failure)', () => {
+    const previouslySynced: SyncRecord = {
+      ...recordAt('syncing', 'synced'),
+      diagnostics: { ...initialSyncRecord().diagnostics, has_verified_remote_copy: true },
+    };
+    const result = transition(previouslySynced, {
+      type: 'SYNC_FAILED',
+      errorCode: 'NETWORK',
+      retryable: true,
+    });
+    expect(result.ok && result.record.diagnostics.has_verified_remote_copy).toBe(true);
+  });
+});
