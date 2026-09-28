@@ -45,12 +45,12 @@ describe('validateEnvelope: happy path', () => {
 describe('validateEnvelope: schema_version handling', () => {
   it('reports a future/unrecognized schema_version as unsupported_schema, not quarantined', async () => {
     const envelope = await goodEnvelope();
-    const future = { ...envelope, schema_version: '2' };
+    const future = { ...envelope, schema_version: '3' };
     expect(await validateEnvelope(future)).toEqual({ status: 'unsupported_schema' });
   });
 
-  it('never forces an unsupported version through the v1 schema (a structurally-invalid v2 object still reports unsupported_schema)', async () => {
-    const wildlyDifferent = { schema_version: '2', anything: 'goes', nested: { a: 1 } };
+  it('never forces an unsupported version through the v1 schema (a structurally-invalid v3 object still reports unsupported_schema)', async () => {
+    const wildlyDifferent = { schema_version: '3', anything: 'goes', nested: { a: 1 } };
     expect(await validateEnvelope(wildlyDifferent)).toEqual({ status: 'unsupported_schema' });
   });
 

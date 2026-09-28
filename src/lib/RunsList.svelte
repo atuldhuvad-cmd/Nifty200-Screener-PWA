@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { RunEnvelopeV1 } from '../core/envelope';
+  import type { RunEnvelopeV1, RunEnvelopeV2 } from '../core/envelope';
   import type { RunRecord } from '../core/storage';
 
   interface Props {
@@ -12,6 +12,16 @@
     return envelope.schema_version === '1';
   }
 
+  function isV2(envelope: RunRecord['envelope']): envelope is RunEnvelopeV2 {
+    return envelope.schema_version === '2';
+  }
+
+  function isSupportedVersion(
+    envelope: RunRecord['envelope'],
+  ): envelope is RunEnvelopeV1 | RunEnvelopeV2 {
+    return isV1(envelope) || isV2(envelope);
+  }
+
   function isAtRisk(run: RunRecord): boolean {
     const { state, diagnostics } = run.sync;
     if (state === 'quarantined' || state === 'unsupported_schema') return false;
@@ -19,15 +29,22 @@
   }
 
   function effectiveDate(run: RunRecord): string {
-    return isV1(run.envelope) ? run.envelope.effective_date : '—';
+    return isSupportedVersion(run.envelope) ? run.envelope.effective_date : '—';
   }
 
   function universe(run: RunRecord): string {
-    return isV1(run.envelope) ? run.envelope.universe : '—';
+    return isSupportedVersion(run.envelope) ? run.envelope.universe : '—';
   }
 
   function stockCount(run: RunRecord): string {
-    return isV1(run.envelope) ? String(run.envelope.stock_count) : '—';
+    return isSupportedVersion(run.envelope) ? String(run.envelope.stock_count) : '—';
+  }
+
+  function sourceDescription(run: RunRecord): string {
+    const envelope = run.envelope;
+    if (isV1(envelope)) return '1 file';
+    if (isV2(envelope)) return `${String(envelope.source_files.length)} parts`;
+    return '—';
   }
 
   const sortedRuns = $derived(
@@ -47,6 +64,7 @@
           <th scope="col">Effective date</th>
           <th scope="col">Universe</th>
           <th scope="col">Stock count</th>
+          <th scope="col">Source</th>
           <th scope="col">Sync state</th>
           <th scope="col">Remote backup</th>
         </tr>
@@ -57,6 +75,7 @@
             <td>{effectiveDate(run)}</td>
             <td>{universe(run)}</td>
             <td>{stockCount(run)}</td>
+            <td>{sourceDescription(run)}</td>
             <td>{run.sync.state}</td>
             <td>
               {#if isAtRisk(run)}

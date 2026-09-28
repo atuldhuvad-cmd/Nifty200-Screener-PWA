@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Produced by scripts/compile-schema.mjs from schema/envelope.v1.schema.json.
+// Produced by scripts/compile-schema.mjs from schema/envelope.v2.schema.json.
 // Regenerate with: node scripts/compile-schema.mjs
 export interface AjvValidationError {
   instancePath: string;

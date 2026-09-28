@@ -10,8 +10,12 @@
   } from './core/storage';
   import { getDatabase } from './lib/db';
   import ImportForm from './lib/ImportForm.svelte';
+  import MultipartImportForm from './lib/MultipartImportForm.svelte';
   import RunsList from './lib/RunsList.svelte';
   import StatusBar from './lib/StatusBar.svelte';
+
+  type ImportMode = 'single' | 'multipart';
+  let importMode = $state<ImportMode>('single');
 
   let db = $state<N200Database | undefined>(undefined);
   let singleTabWarning = $state(false);
@@ -58,12 +62,53 @@
     <p role="alert" class="n200-badge n200-badge--error">{initError}</p>
   {:else if db}
     <StatusBar {singleTabWarning} {persist} {atRiskCount} />
-    <ImportForm
-      {db}
-      onCommitted={() => {
-        if (db) void refresh(db);
-      }}
-    />
+
+    <fieldset>
+      <legend>Import type</legend>
+      <div>
+        <input
+          id="import-mode-single"
+          type="radio"
+          name="import-mode"
+          value="single"
+          checked={importMode === 'single'}
+          onchange={() => {
+            importMode = 'single';
+          }}
+        />
+        <label for="import-mode-single">Single file</label>
+      </div>
+      <div>
+        <input
+          id="import-mode-multipart"
+          type="radio"
+          name="import-mode"
+          value="multipart"
+          checked={importMode === 'multipart'}
+          onchange={() => {
+            importMode = 'multipart';
+          }}
+        />
+        <label for="import-mode-multipart">Multipart export</label>
+      </div>
+    </fieldset>
+
+    {#if importMode === 'single'}
+      <ImportForm
+        {db}
+        onCommitted={() => {
+          if (db) void refresh(db);
+        }}
+      />
+    {:else}
+      <MultipartImportForm
+        {db}
+        onCommitted={() => {
+          if (db) void refresh(db);
+        }}
+      />
+    {/if}
+
     <RunsList {runs} />
   {:else}
     <p>Opening local storage&hellip;</p>
@@ -79,5 +124,24 @@
 
   h1 {
     color: var(--color-gold);
+  }
+
+  fieldset {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    margin-block: 1rem;
+  }
+
+  fieldset div {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  legend {
+    font-weight: 600;
+    padding-inline: 0.25rem;
   }
 </style>

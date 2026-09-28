@@ -1,6 +1,8 @@
 import { analyzeCsvBytes } from '../src/core/csv/analyze';
+import { analyzeMultipartParts, type MultipartPartInput } from '../src/core/csv/multipart';
 import { buildEnvelope } from '../src/core/envelope/build';
-import type { RunEnvelopeV1 } from '../src/core/envelope/types';
+import { buildMultipartEnvelope } from '../src/core/envelope/buildMultipart';
+import type { RunEnvelopeV1, RunEnvelopeV2 } from '../src/core/envelope/types';
 import { synthetic } from './helpers';
 
 let counter = 0;
@@ -35,5 +37,36 @@ export async function buildTestEnvelope(options: TestEnvelopeOptions = {}): Prom
     ...(options.runId !== undefined ? { runId: options.runId } : {}),
   });
   if (!result.ok) throw new Error(`build failed: ${result.reason}`);
+  return result.envelope;
+}
+
+export interface TestMultipartEnvelopeOptions {
+  parts: { fixtureBytes: Uint8Array; filename: string }[];
+  runId?: string;
+  effectiveDate?: string;
+  importedAt?: Date;
+}
+
+/** Builds a real, schema-valid v2 (multipart) envelope from raw part bytes, for storage-layer tests. */
+export async function buildTestMultipartEnvelope(
+  options: TestMultipartEnvelopeOptions,
+): Promise<RunEnvelopeV2> {
+  const inputs: MultipartPartInput[] = options.parts.map((p) => ({
+    bytes: p.fixtureBytes,
+    filename: p.filename,
+    mimeType: 'text/csv',
+  }));
+  const analysis = analyzeMultipartParts(inputs);
+  if (!analysis.ok || !analysis.canConfirm) {
+    throw new Error('multipart fixture did not analyze cleanly');
+  }
+  const result = await buildMultipartEnvelope({
+    analysis,
+    fileMimeTypes: inputs.map((i) => i.mimeType),
+    effectiveDate: options.effectiveDate ?? '2026-09-27',
+    ...(options.importedAt !== undefined ? { importedAt: options.importedAt } : {}),
+    ...(options.runId !== undefined ? { runId: options.runId } : {}),
+  });
+  if (!result.ok) throw new Error(`multipart build failed: ${result.reason}`);
   return result.envelope;
 }

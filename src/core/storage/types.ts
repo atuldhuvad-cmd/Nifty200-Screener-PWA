@@ -1,4 +1,4 @@
-import type { RunEnvelopeV1 } from '../envelope/types';
+import type { RunEnvelopeV1, RunEnvelopeV2 } from '../envelope/types';
 
 /**
  * The complete declared sync-state set from the brief's "Local storage" section — no state is
@@ -72,7 +72,7 @@ export interface UnsupportedSchemaEnvelope {
 
 export interface RunRecord {
   run_id: string;
-  envelope: RunEnvelopeV1 | UnsupportedSchemaEnvelope;
+  envelope: RunEnvelopeV1 | RunEnvelopeV2 | UnsupportedSchemaEnvelope;
   sync: SyncRecord;
 }
 

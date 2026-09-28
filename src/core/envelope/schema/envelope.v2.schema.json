@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://n200-screener.local/schema/envelope.v2.schema.json",
+  "title": "Nifty 200 Screener run envelope, schema v2 (multipart)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "universe",
+    "universe_validation",
+    "effective_date",
+    "imported_at",
+    "source_files",
+    "combined_row_refs",
+    "import_warnings",
+    "stock_count",
+    "unique_stock_count",
+    "computed_metrics",
+    "envelope_hash_algorithm",
+    "envelope_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "2" },
+    "run_id": { "$ref": "#/$defs/uuidV4" },
+    "universe": { "const": "Nifty 200" },
+    "universe_validation": { "const": "user_confirmed" },
+    "effective_date": { "$ref": "#/$defs/isoDate" },
+    "imported_at": { "$ref": "#/$defs/rfc3339Z" },
+    "source_files": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/sourceFile" }
+    },
+    "combined_row_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/combinedRowRef" }
+    },
+    "import_warnings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/combinedImportWarning" }
+    },
+    "stock_count": { "$ref": "#/$defs/nonNegativeInteger" },
+    "unique_stock_count": { "$ref": "#/$defs/nonNegativeInteger" },
+    "query_text": { "type": "string" },
+    "computed_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["volume_ratio_v1"],
+      "properties": {
+        "volume_ratio_v1": { "type": "array", "items": { "$ref": "#/$defs/volumeRatioMetric" } }
+      }
+    },
+    "envelope_hash_algorithm": { "const": "sha256-jcs-rfc8785-v1" },
+    "envelope_sha256": { "$ref": "#/$defs/sha256Hex" }
+  },
+  "$defs": {
+    "nonNegativeInteger": { "type": "integer", "minimum": 0 },
+    "sha256Hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "uuidV4": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "isoDate": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "rfc3339Z": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
+    },
+    "base64Canonical": {
+      "type": "string",
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    },
+    "fieldKey": {
+      "enum": [
+        "volumeNumerator",
+        "volumeDenominator",
+        "isin",
+        "nseCode",
+        "providerVolumeRatio",
+        "serialNumber"
+      ]
+    },
+    "partialPageReason": { "enum": ["row_count_page_size", "serial_number_not_starting_at_1"] },
+    "importWarningCode": {
+      "enum": [
+        "BLANK_HEADER",
+        "DUPLICATE_HEADER",
+        "OPTIONAL_COLUMN_AMBIGUOUS",
+        "MIXED_LINE_ENDINGS",
+        "POSSIBLE_PARTIAL_PAGE",
+        "PROVIDER_VOLUME_RATIO_MISMATCH",
+        "DUPLICATE_ISIN_IN_RUN",
+        "DUPLICATE_NSE_CODE_IN_RUN",
+        "ROWS_EXCLUDED_FROM_COMPARISON",
+        "IDENTIFIER_COLUMN_MISSING",
+        "EMPTY_RUN"
+      ]
+    },
+    "importWarning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {
+        "code": { "$ref": "#/$defs/importWarningCode" },
+        "columns": { "type": "array", "items": { "$ref": "#/$defs/nonNegativeInteger" } },
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/nonNegativeInteger" } },
+        "field": { "$ref": "#/$defs/fieldKey" },
+        "reasons": { "type": "array", "items": { "$ref": "#/$defs/partialPageReason" } }
+      }
+    },
+    "combinedImportWarningCode": { "enum": ["COMBINED_COUNT_NOT_200"] },
+    "combinedImportWarning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "unique_stock_count"],
+      "properties": {
+        "code": { "$ref": "#/$defs/combinedImportWarningCode" },
+        "unique_stock_count": { "$ref": "#/$defs/nonNegativeInteger" }
+      }
+    },
+    "combinedRowRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_index", "source_row_index"],
+      "properties": {
+        "source_index": { "$ref": "#/$defs/nonNegativeInteger" },
+        "source_row_index": { "$ref": "#/$defs/nonNegativeInteger" }
+      }
+    },
+    "volumeRatioReason": {
+      "enum": [
+        "MISSING_NUMERATOR",
+        "MISSING_DENOMINATOR",
+        "INVALID_NUMERATOR",
+        "INVALID_DENOMINATOR",
+        "NEGATIVE_NUMERATOR",
+        "NON_POSITIVE_DENOMINATOR"
+      ]
+    },
+    "numericDetail": { "enum": ["grouping_comma"] },
+    "volumeRatioMetric": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "value", "scale", "metric_version"],
+          "properties": {
+            "status": { "const": "valid" },
+            "value": { "type": "string", "pattern": "^-?(0|[1-9][0-9]*)\\.[0-9]{3}$" },
+            "scale": { "const": 3 },
+            "metric_version": { "const": "volume_ratio_v1" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "value", "reason", "metric_version"],
+          "properties": {
+            "status": { "const": "invalid" },
+            "value": { "type": "null" },
+            "reason": { "$ref": "#/$defs/volumeRatioReason" },
+            "detail": { "$ref": "#/$defs/numericDetail" },
+            "metric_version": { "const": "volume_ratio_v1" }
+          }
+        }
+      ]
+    },
+    "parserProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parser_id",
+        "parser_version",
+        "config_id",
+        "encoding",
+        "bom_present",
+        "delimiter",
+        "quote",
+        "escape",
+        "newline",
+        "final_newline"
+      ],
+      "properties": {
+        "parser_id": { "type": "string", "minLength": 1 },
+        "parser_version": { "type": "string", "minLength": 1 },
+        "config_id": { "type": "string", "minLength": 1 },
+        "encoding": { "const": "utf-8" },
+        "bom_present": { "type": "boolean" },
+        "delimiter": { "const": "," },
+        "quote": { "const": "\"" },
+        "escape": { "const": "\"" },
+        "newline": { "enum": ["LF", "CRLF", "mixed", "none"] },
+        "final_newline": { "type": "boolean" }
+      }
+    },
+    "sourceFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "original_filename",
+        "original_file_byte_length",
+        "original_file_mime_type",
+        "original_file_sha256",
+        "original_file_base64",
+        "parser",
+        "headers",
+        "rows",
+        "import_warnings"
+      ],
+      "properties": {
+        "original_filename": { "type": "string", "minLength": 1 },
+        "original_file_byte_length": { "$ref": "#/$defs/nonNegativeInteger" },
+        "original_file_mime_type": { "type": "string" },
+        "original_file_sha256": { "$ref": "#/$defs/sha256Hex" },
+        "original_file_base64": { "$ref": "#/$defs/base64Canonical" },
+        "parser": { "$ref": "#/$defs/parserProvenance" },
+        "headers": { "type": "array", "items": { "type": "string" } },
+        "rows": {
+          "type": "array",
+          "items": { "type": "array", "items": { "type": "string" } }
+        },
+        "import_warnings": { "type": "array", "items": { "$ref": "#/$defs/importWarning" } }
+      }
+    }
+  }
+}

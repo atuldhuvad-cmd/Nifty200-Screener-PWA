@@ -5,6 +5,8 @@ import type { Page } from '@playwright/test';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 export const SAMPLE_SEVEN_ROW = join(ROOT, 'samples', 'Nifty200 All_September 27, 2026 (2).csv');
+export const SAMPLE_PAGE_1 = join(ROOT, 'samples', 'Nifty200 All_September 27, 2026.csv');
+export const SAMPLE_PAGE_2 = join(ROOT, 'samples', 'Nifty200 All_September 27, 2026 (1).csv');
 export const FIXTURE_MISSING_NUMERATOR = join(
   ROOT,
   'tests',
@@ -31,4 +33,24 @@ export async function fillRequiredFields(page: Page, effectiveDate = '2026-09-27
 
 export async function confirmImport(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Confirm import' }).click();
+}
+
+export async function switchToMultipartImport(page: Page): Promise<void> {
+  await page.getByLabel('Multipart export').check();
+}
+
+export async function chooseMultipartFiles(page: Page, paths: string[]): Promise<void> {
+  await page.getByLabel('Choose CSV files (two or more)').setInputFiles(paths);
+}
+
+export async function fillMultipartRequiredFields(
+  page: Page,
+  effectiveDate = '2026-09-27',
+): Promise<void> {
+  await page.getByLabel('Effective date (required)').fill(effectiveDate);
+  await page.getByLabel('I confirm these files together are a Nifty 200 export.').check();
+}
+
+export async function confirmMultipartImport(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Confirm multipart import' }).click();
 }

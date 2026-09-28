@@ -104,7 +104,8 @@ describe('commitNewRun', () => {
     expect(result).toEqual({ ok: true, run_id: built.envelope.run_id });
 
     const stored = await getRun(db, built.envelope.run_id);
-    expect(stored?.envelope.rows).toEqual([]);
+    if (stored?.envelope.schema_version !== '1') throw new Error('expected a v1 envelope');
+    expect(stored.envelope.rows).toEqual([]);
     const compRows = await db.getAllFromIndex(
       STORE.comparisonIdentity,
       COMPARISON_BY_RUN_ID,

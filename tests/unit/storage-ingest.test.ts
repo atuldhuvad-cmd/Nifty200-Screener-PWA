@@ -141,7 +141,7 @@ describe('ingestEnvelopeBytes: unsupported_schema is preserved but excluded from
   it('a future schema_version with a usable run_id is preserved in runs with state unsupported_schema', async () => {
     const future = {
       run_id: '99999999-9999-4999-8999-999999999999',
-      schema_version: '2',
+      schema_version: '3',
       anything: 'goes',
     };
     const outcome = await ingestEnvelopeBytes(db, enc(future), 'drive');
@@ -153,7 +153,7 @@ describe('ingestEnvelopeBytes: unsupported_schema is preserved but excluded from
   });
 
   it('is excluded from findRunsByOriginalFileHash-style active queries (never interpreted)', async () => {
-    const future = { run_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', schema_version: '2' };
+    const future = { run_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', schema_version: '3' };
     await ingestEnvelopeBytes(db, enc(future), 'drive');
     // The comparison-identity index — the "active view" this app actually queries — has no
     // rows for it, since an unsupported-schema envelope is never parsed for identity.
@@ -162,7 +162,7 @@ describe('ingestEnvelopeBytes: unsupported_schema is preserved but excluded from
   });
 
   it('a future schema_version with no usable run_id is quarantined instead (cannot key runs by it)', async () => {
-    const outcome = await ingestEnvelopeBytes(db, enc({ schema_version: '2' }), 'drive');
+    const outcome = await ingestEnvelopeBytes(db, enc({ schema_version: '3' }), 'drive');
     expect(outcome).toMatchObject({
       kind: 'quarantined',
       reasons: ['NO_USABLE_RUN_ID_FOR_UNSUPPORTED_SCHEMA'],
@@ -172,7 +172,7 @@ describe('ingestEnvelopeBytes: unsupported_schema is preserved but excluded from
   it('does not overwrite an existing run at the same run_id', async () => {
     const envelope = await buildTestEnvelope({ runId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' });
     await commitNewRun(db, envelope);
-    const future = { run_id: envelope.run_id, schema_version: '2' };
+    const future = { run_id: envelope.run_id, schema_version: '3' };
     const outcome = await ingestEnvelopeBytes(db, enc(future), 'drive');
     expect(outcome).toMatchObject({ kind: 'quarantined', reasons: ['RUN_ID_ALREADY_OCCUPIED'] });
     expect((await getRun(db, envelope.run_id))?.envelope).toEqual(envelope);

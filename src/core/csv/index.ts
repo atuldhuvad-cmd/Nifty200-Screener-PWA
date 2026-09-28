@@ -28,3 +28,18 @@ export {
   VOLUME_RATIO_REASONS,
 } from './volumeRatio';
 export type { VolumeRatioMetric, VolumeRatioReason } from './volumeRatio';
+export {
+  analyzeMultipartParts,
+  MULTIPART_OVERLAP_CODES,
+  MULTIPART_WARNING_CODES,
+} from './multipart';
+export type {
+  CombinedRowAnalysis,
+  MultipartAnalysis,
+  MultipartOverlapCode,
+  MultipartOverlapError,
+  MultipartPartInput,
+  MultipartPartResult,
+  MultipartWarning,
+  MultipartWarningCode,
+} from './multipart';

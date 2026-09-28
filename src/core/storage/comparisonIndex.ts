@@ -1,7 +1,7 @@
 import type { IDBPObjectStore, StoreNames } from 'idb';
 import { mapColumns } from '../csv/headers';
 import { buildStockIdentity } from '../csv/identifiers';
-import type { RunEnvelopeV1 } from '../envelope/types';
+import type { RunEnvelopeV1, RunEnvelopeV2 } from '../envelope/types';
 import {
   COMPARISON_BY_IDENTITY_KEY,
   COMPARISON_BY_RUN_ID,
@@ -18,15 +18,42 @@ function identityKeyFor(
   return matchMethod === 'isin' ? `isin:${normalizedId}` : `nse:${normalizedId}`;
 }
 
-function deriveComparisonRows(runId: string, envelope: RunEnvelopeV1): ComparisonIdentityRecord[] {
-  const mapping = mapColumns(envelope.headers);
-  const isinCol = mapping.columns.isin;
-  const nseCol = mapping.columns.nseCode;
+/** For v1: `row_index` is the position in `envelope.rows`. For v2: `row_index` is the position
+ * in `envelope.combined_row_refs` (the combined ordering) — in both cases, "this run's own row
+ * position," so `ComparisonIdentityRecord` needs no v2-specific field. */
+function identityInputsFor(
+  envelope: RunEnvelopeV1 | RunEnvelopeV2,
+): { rawIsin: string; rawNse: string }[] {
+  const extract = (mapping: ReturnType<typeof mapColumns>, row: string[]) => {
+    const isinCol = mapping.columns.isin;
+    const nseCol = mapping.columns.nseCode;
+    return {
+      rawIsin: isinCol !== undefined ? (row[isinCol] ?? '') : '',
+      rawNse: nseCol !== undefined ? (row[nseCol] ?? '') : '',
+    };
+  };
+
+  if (envelope.schema_version === '1') {
+    const mapping = mapColumns(envelope.headers);
+    return envelope.rows.map((row) => extract(mapping, row));
+  }
+
+  const mappingBySource = envelope.source_files.map((sf) => mapColumns(sf.headers));
+  return envelope.combined_row_refs.map((ref) => {
+    const mapping = mappingBySource[ref.source_index];
+    const row = envelope.source_files[ref.source_index]?.rows[ref.source_row_index];
+    if (mapping === undefined || row === undefined) return { rawIsin: '', rawNse: '' };
+    return extract(mapping, row);
+  });
+}
+
+function deriveComparisonRows(
+  runId: string,
+  envelope: RunEnvelopeV1 | RunEnvelopeV2,
+): ComparisonIdentityRecord[] {
   const rows: ComparisonIdentityRecord[] = [];
 
-  envelope.rows.forEach((row, rowIndex) => {
-    const rawIsin = isinCol !== undefined ? (row[isinCol] ?? '') : '';
-    const rawNse = nseCol !== undefined ? (row[nseCol] ?? '') : '';
+  identityInputsFor(envelope).forEach(({ rawIsin, rawNse }, rowIndex) => {
     const identity = buildStockIdentity(rawIsin, rawNse);
     // Both normalized identifiers are stored on every indexed row, regardless of which one
     // `match_method` is keyed on (Bugbot P2-2) — needed so a "same NSE Code, different ISIN"
@@ -76,7 +103,7 @@ export async function rebuildComparisonIndexTx<
 >(
   store: IDBPObjectStore<N200DBSchema, TxStores, typeof STORE.comparisonIdentity, Mode>,
   runId: string,
-  envelope: RunEnvelopeV1,
+  envelope: RunEnvelopeV1 | RunEnvelopeV2,
 ): Promise<void> {
   const existingKeys = await store.index(COMPARISON_BY_RUN_ID).getAllKeys(runId);
   for (const key of existingKeys) await store.delete(key);

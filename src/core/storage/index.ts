@@ -21,7 +21,9 @@ export type { PersistPromptResult } from './persistence';
 export {
   applyTransition,
   commitNewRun,
+  findRunsByExactSourceHashSet,
   findRunsByOriginalFileHash,
+  findRunsBySourceFileHash,
   getAllRuns,
   getRun,
   rebuildComparisonIndexForRun,

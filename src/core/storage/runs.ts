@@ -1,6 +1,6 @@
 import { mapColumns } from '../csv/headers';
 import { buildStockIdentity } from '../csv/identifiers';
-import type { RunEnvelopeV1 } from '../envelope/types';
+import type { RunEnvelopeV1, RunEnvelopeV2 } from '../envelope/types';
 import { rebuildComparisonIndexTx } from './comparisonIndex';
 import { RUNS_BY_ORIGINAL_FILE_SHA256, STORE, type N200Database } from './schema';
 import { transition, type SyncEvent } from './syncState';
@@ -24,7 +24,7 @@ export type CommitNewRunResult =
  */
 export async function commitNewRun(
   db: N200Database,
-  envelope: RunEnvelopeV1,
+  envelope: RunEnvelopeV1 | RunEnvelopeV2,
 ): Promise<CommitNewRunResult> {
   const tx = db.transaction([STORE.runs, STORE.comparisonIdentity], 'readwrite');
   const record: RunRecord = {
@@ -62,6 +62,57 @@ export async function findRunsByOriginalFileHash(
 ): Promise<string[]> {
   const records = await db.getAllFromIndex(STORE.runs, RUNS_BY_ORIGINAL_FILE_SHA256, sha256);
   return records.map((r) => r.run_id);
+}
+
+function isV1(envelope: RunRecord['envelope']): envelope is RunEnvelopeV1 {
+  return envelope.schema_version === '1';
+}
+
+function isV2(envelope: RunRecord['envelope']): envelope is RunEnvelopeV2 {
+  return envelope.schema_version === '2';
+}
+
+/** Every source-file hash a run was built from: a v1 run's single `original_file_sha256`, or
+ * a v2 run's `source_files[].original_file_sha256`, in source order. */
+function sourceHashesOf(envelope: RunRecord['envelope']): string[] {
+  if (isV1(envelope)) return [envelope.original_file_sha256];
+  if (isV2(envelope)) return envelope.source_files.map((sf) => sf.original_file_sha256);
+  return [];
+}
+
+/**
+ * Non-blocking duplicate check for a multipart import (Step 4A): does this hash belong to any
+ * previously-imported file, whether that file was committed as a single-file v1 run or as one
+ * part of a multipart v2 run? No index backs this (the dataset is small and local-first; see
+ * DECISIONS.md) — it is a full scan, same performance posture as the rest of this app's
+ * "no server, no scale" design.
+ */
+export async function findRunsBySourceFileHash(
+  db: N200Database,
+  sha256: string,
+): Promise<string[]> {
+  const all = await getAllRuns(db);
+  return all.filter((r) => sourceHashesOf(r.envelope).includes(sha256)).map((r) => r.run_id);
+}
+
+/**
+ * The stronger multipart duplicate signal (Step 4A): does any existing run's *complete, ordered*
+ * set of source-file hashes exactly equal this candidate set? A match means this exact
+ * combination of files (in this exact order) was already imported as one run.
+ */
+export async function findRunsByExactSourceHashSet(
+  db: N200Database,
+  orderedSha256: string[],
+): Promise<string[]> {
+  const all = await getAllRuns(db);
+  return all
+    .filter((r) => {
+      const hashes = sourceHashesOf(r.envelope);
+      return (
+        hashes.length === orderedSha256.length && hashes.every((h, i) => h === orderedSha256[i])
+      );
+    })
+    .map((r) => r.run_id);
 }
 
 export async function getRun(db: N200Database, runId: string): Promise<RunRecord | undefined> {
@@ -114,12 +165,14 @@ export async function applyTransition(
  */
 export async function rebuildComparisonIndexForRun(db: N200Database, runId: string): Promise<void> {
   const record = await db.get(STORE.runs, runId);
-  if (!record || record.envelope.schema_version !== '1') return;
+  if (!record) return;
+  const { schema_version } = record.envelope;
+  if (schema_version !== '1' && schema_version !== '2') return;
   const tx = db.transaction(STORE.comparisonIdentity, 'readwrite');
   await rebuildComparisonIndexTx(
     tx.objectStore(STORE.comparisonIdentity),
     runId,
-    record.envelope as RunEnvelopeV1,
+    record.envelope as RunEnvelopeV1 | RunEnvelopeV2,
   );
   await tx.done;
 }
