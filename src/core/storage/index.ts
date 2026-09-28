@@ -1,11 +1,16 @@
 export {
   findIdentityConflicts,
   isinIdentityKey,
+  listComparisonIdentityGroups,
   nseIdentityKey,
   queryComparisonIndexByIdentity,
   rebuildComparisonIndexTx,
 } from './comparisonIndex';
-export type { IdentityConflictEntry, IdentityConflictGroup } from './comparisonIndex';
+export type {
+  ComparisonIdentityGroup,
+  IdentityConflictEntry,
+  IdentityConflictGroup,
+} from './comparisonIndex';
 export type { IngestOutcome } from './ingest';
 export { ingestEnvelopeBytes } from './ingest';
 export { REDACTED, sanitizeQuarantineDiscoveryMetadata } from './sanitizeDiscoveryMetadata';
