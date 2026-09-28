@@ -5,6 +5,12 @@ coverage/
 *.tsbuildinfo
 .vite/
 
+# Playwright artifacts
+test-results/
+playwright-report/
+blob-report/
+screenshots/
+
 # Real provider exports: not synthetic, never committed (global privacy rule; Trendlyne ToS unreviewed)
 samples/
 

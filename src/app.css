@@ -1,0 +1,101 @@
+:root {
+  --color-bg: #ffffff;
+  --color-surface: #f7f5f0;
+  --color-text: #1a1a1a;
+  --color-border: #706b5c;
+  --color-gold: #8a6d1f;
+  --color-gold-bg: #fbf1d3;
+  --color-error: #a6280f;
+  --color-error-bg: #fbe9e6;
+  --color-warning: #7a4c00;
+  --color-warning-bg: #fbf0da;
+  --color-success: #185c34;
+  --color-success-bg: #e4f3e9;
+  --color-focus: #1a4b8c;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--color-focus);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+fieldset {
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid var(--color-border);
+  padding: var(--space-2);
+  text-align: left;
+}
+
+.n200-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.15rem 0.5rem;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: var(--color-bg);
+}
+
+.n200-badge--error {
+  color: var(--color-error);
+  background: var(--color-error-bg);
+}
+
+.n200-badge--warning {
+  color: var(--color-warning);
+  background: var(--color-warning-bg);
+}
+
+.n200-badge--success {
+  color: var(--color-success);
+  background: var(--color-success-bg);
+}
+
+.n200-badge--gold {
+  color: var(--color-gold);
+  background: var(--color-gold-bg);
+}
