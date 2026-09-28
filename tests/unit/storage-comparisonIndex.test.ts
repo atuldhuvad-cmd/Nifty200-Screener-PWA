@@ -271,3 +271,118 @@ describe('Bugbot P2-2: same-NSE-Code/different-ISIN is detected as an identity c
     expect(conflicts.find((c) => c.normalized_nse_code === 'SYNA')).toBeUndefined();
   });
 });
+
+describe('Security review P1-C: single-transaction reads, and state filtering applied to findIdentityConflicts too', () => {
+  type TransactionFn = N200Database['transaction'];
+  function patchTransactionCounter(database: N200Database) {
+    const calls: unknown[][] = [];
+    const original: TransactionFn = database.transaction.bind(database);
+    const patched = ((...args: Parameters<TransactionFn>) => {
+      calls.push(args);
+      return (original as (...a: Parameters<TransactionFn>) => ReturnType<TransactionFn>)(...args);
+    }) as TransactionFn;
+    (database as { transaction: TransactionFn }).transaction = patched;
+    return {
+      calls,
+      restore: () => {
+        (database as { transaction: TransactionFn }).transaction = original;
+      },
+    };
+  }
+
+  it('queryComparisonIndexByIdentity reads comparison rows and run states via exactly one explicit transaction spanning both stores', async () => {
+    const envelope = await buildFrom('SYNTHETIC_crlf_final_newline.csv', crypto.randomUUID());
+    await commitNewRun(db, envelope);
+
+    const { calls, restore } = patchTransactionCounter(db);
+    try {
+      await queryComparisonIndexByIdentity(db, isinIdentityKey('ZZSYNTH00015'));
+    } finally {
+      restore();
+    }
+
+    // Exactly one db.transaction(...) call, scoped to BOTH stores together — not a separate
+    // getAllFromIndex shortcut (its own transaction) plus one db.get(...) shortcut per row
+    // (each its own transaction), which is what the pre-fix implementation did.
+    expect(calls).toHaveLength(1);
+    const [storeNames] = calls[0] as [string[] | string];
+    const scoped = Array.isArray(storeNames) ? storeNames : [storeNames];
+    expect(scoped).toEqual(expect.arrayContaining([STORE.comparisonIdentity, STORE.runs]));
+  });
+
+  it('findIdentityConflicts also reads via exactly one explicit transaction spanning both stores', async () => {
+    const bytes = buildCsv([
+      SYNTHETIC_HEADER,
+      ['1', 'Synthetic A', '', '1500', '1000', 'SYNSHARED2', 'ZZSYNTH00015'],
+      ['2', 'Synthetic B', '', '1500', '1000', 'SYNSHARED2', 'ZZSYNTH00023'],
+    ]);
+    const analysis = analyzeCsvBytes(bytes);
+    if (!analysis.ok || !analysis.canConfirm) throw new Error('fixture did not analyze cleanly');
+    const built = await buildEnvelope({
+      originalBytes: bytes,
+      analysis,
+      originalFilename: 'conflict2.csv',
+      originalFileMimeType: 'text/csv',
+      effectiveDate: '2026-09-27',
+    });
+    if (!built.ok) throw new Error('build failed');
+    await commitNewRun(db, built.envelope);
+
+    const { calls, restore } = patchTransactionCounter(db);
+    try {
+      await findIdentityConflicts(db);
+    } finally {
+      restore();
+    }
+    expect(calls).toHaveLength(1);
+    const [storeNames] = calls[0] as [string[] | string];
+    const scoped = Array.isArray(storeNames) ? storeNames : [storeNames];
+    expect(scoped).toEqual(expect.arrayContaining([STORE.comparisonIdentity, STORE.runs]));
+  });
+
+  it('findIdentityConflicts excludes rows belonging to a conflict/quarantined/unsupported_schema run, and includes them again once resolved', async () => {
+    const bytes = buildCsv([
+      SYNTHETIC_HEADER,
+      ['1', 'Synthetic A', '', '1500', '1000', 'SYNSHARED3', 'ZZSYNTH00015'],
+      ['2', 'Synthetic B', '', '1500', '1000', 'SYNSHARED3', 'ZZSYNTH00023'],
+    ]);
+    const analysis = analyzeCsvBytes(bytes);
+    if (!analysis.ok || !analysis.canConfirm) throw new Error('fixture did not analyze cleanly');
+    const built = await buildEnvelope({
+      originalBytes: bytes,
+      analysis,
+      originalFilename: 'conflict3.csv',
+      originalFileMimeType: 'text/csv',
+      effectiveDate: '2026-09-27',
+    });
+    if (!built.ok) throw new Error('build failed');
+    await commitNewRun(db, built.envelope);
+
+    expect(
+      (await findIdentityConflicts(db)).find((c) => c.normalized_nse_code === 'SYNSHARED3'),
+    ).toBeDefined();
+
+    await applyTransition(db, built.envelope.run_id, { type: 'QUARANTINE' });
+    expect(
+      (await findIdentityConflicts(db)).find((c) => c.normalized_nse_code === 'SYNSHARED3'),
+    ).toBeUndefined();
+  });
+
+  it('a query started before a concurrent quarantine transition commits still sees the pre-quarantine snapshot; a fresh query afterward correctly excludes it', async () => {
+    const envelope = await buildFrom('SYNTHETIC_crlf_final_newline.csv', crypto.randomUUID());
+    await commitNewRun(db, envelope);
+    const key = isinIdentityKey('ZZSYNTH00015');
+
+    // Fired back-to-back, not awaited in between: the query's transaction (spanning both
+    // stores) is requested first, so — per IndexedDB's ordering of transactions with
+    // overlapping scope — it is guaranteed a consistent snapshot from before the quarantine
+    // transaction's write is applied, even though both settle around the same time.
+    const queryPromise = queryComparisonIndexByIdentity(db, key);
+    const quarantinePromise = applyTransition(db, envelope.run_id, { type: 'QUARANTINE' });
+    const [queryResult] = await Promise.all([queryPromise, quarantinePromise]);
+    expect(queryResult.map((r) => r.run_id)).toContain(envelope.run_id);
+
+    const freshResult = await queryComparisonIndexByIdentity(db, key);
+    expect(freshResult.map((r) => r.run_id)).not.toContain(envelope.run_id);
+  });
+});

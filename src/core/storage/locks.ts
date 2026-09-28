@@ -33,3 +33,24 @@ export async function withMigrationLock<T>(
   const result = await locks.request(lockName, () => fn());
   return { usedLock: true, result };
 }
+
+export function isWebLocksAvailable(): boolean {
+  return getWebLocks() !== null;
+}
+
+export const WEB_LOCKS_UNAVAILABLE_CODE = 'WEB_LOCKS_UNAVAILABLE';
+
+/**
+ * Fail closed (security review P2-A): a guarded write/migration/sync entry point must refuse
+ * to run rather than execute uncoordinated when Web Locks are unavailable — silently allowing
+ * it (the old single-tab "fallback" behaviour) risks a real cross-tab race with no way to
+ * detect it. Reads are unaffected; callers only guard the specific operations that need
+ * cross-tab exclusivity.
+ */
+export class WebLocksUnavailableError extends Error {
+  readonly code = WEB_LOCKS_UNAVAILABLE_CODE;
+  constructor(message: string) {
+    super(message);
+    this.name = 'WebLocksUnavailableError';
+  }
+}

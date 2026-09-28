@@ -18,17 +18,21 @@ export async function requestPersistentStorage(): Promise<PersistPromptResult> {
 
 /**
  * Count of runs with no verified Drive copy right now — the ones storage eviction actually
- * puts at risk (§9 review, item 4): `pending`, `local_only`, and `remote_missing`
- * unconditionally, plus `error` only for a run that has never once synced successfully
- * (`last_success_at === null`) — an `error` run that previously synced still has a verified
- * remote copy from before the failure. Already-`synced` runs are excluded outright.
+ * puts at risk. `diagnostics.has_verified_remote_copy` is the **sole authoritative** signal
+ * (security review P1-A): it is set `true` only by `SYNC_SUCCEEDED` and cleared back to
+ * `false` by `REMOTE_MISSING_DETECTED` or by entering `conflict`, so it always reflects
+ * whether a verified copy exists *right now* — unlike `last_success_at`, which only records
+ * that a sync succeeded *at some point* and stays non-null forever afterward, even once that
+ * copy is known to be gone or superseded. Every state counts on this signal alone — including
+ * `error` and `conflict` — **except** `quarantined` and `unsupported_schema`, which are
+ * out of scope for this warning (an unresolved/uninterpreted run, not itself the kind of
+ * "storage eviction risk" this count is about).
  */
 export async function countAtRiskRuns(db: N200Database): Promise<number> {
   const runs = await getAllRuns(db);
   return runs.filter((r) => {
     const { state, diagnostics } = r.sync;
-    if (state === 'pending' || state === 'local_only' || state === 'remote_missing') return true;
-    if (state === 'error') return diagnostics.last_success_at === null;
-    return false;
+    if (state === 'quarantined' || state === 'unsupported_schema') return false;
+    return !diagnostics.has_verified_remote_copy;
   }).length;
 }

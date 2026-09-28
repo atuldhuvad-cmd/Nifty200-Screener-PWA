@@ -8,7 +8,12 @@ export {
 export type { IdentityConflictEntry, IdentityConflictGroup } from './comparisonIndex';
 export type { IngestOutcome } from './ingest';
 export { ingestEnvelopeBytes } from './ingest';
-export { withMigrationLock } from './locks';
+export {
+  isWebLocksAvailable,
+  WEB_LOCKS_UNAVAILABLE_CODE,
+  WebLocksUnavailableError,
+  withMigrationLock,
+} from './locks';
 export type { LockOutcome } from './locks';
 export { countAtRiskRuns, requestPersistentStorage } from './persistence';
 export type { PersistPromptResult } from './persistence';

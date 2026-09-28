@@ -72,8 +72,9 @@ function deriveComparisonRows(runId: string, envelope: RunEnvelopeV1): Compariso
  */
 export async function rebuildComparisonIndexTx<
   TxStores extends readonly StoreNames<N200DBSchema>[],
+  Mode extends 'readwrite' | 'versionchange' = 'readwrite',
 >(
-  store: IDBPObjectStore<N200DBSchema, TxStores, typeof STORE.comparisonIdentity, 'readwrite'>,
+  store: IDBPObjectStore<N200DBSchema, TxStores, typeof STORE.comparisonIdentity, Mode>,
   runId: string,
   envelope: RunEnvelopeV1,
 ): Promise<void> {
@@ -98,16 +99,22 @@ export async function queryComparisonIndexByIdentity(
   db: N200Database,
   identityKey: string,
 ): Promise<ComparisonIdentityRecord[]> {
-  const rows = await db.getAllFromIndex(
-    STORE.comparisonIdentity,
-    COMPARISON_BY_IDENTITY_KEY,
-    identityKey,
-  );
+  // One explicit transaction spanning both stores (security review P1-C): every read below
+  // sees one consistent snapshot taken when the transaction starts, so a concurrent
+  // applyTransition() can never produce a "torn" result mixing rows and run states from two
+  // different points in time — unlike separate db.getAllFromIndex/db.get shortcut calls, each
+  // of which opens its own transaction.
+  const tx = db.transaction([STORE.comparisonIdentity, STORE.runs], 'readonly');
+  const rows = await tx
+    .objectStore(STORE.comparisonIdentity)
+    .index(COMPARISON_BY_IDENTITY_KEY)
+    .getAll(identityKey);
   const eligible: ComparisonIdentityRecord[] = [];
   for (const row of rows) {
-    const run = await db.get(STORE.runs, row.run_id);
+    const run = await tx.objectStore(STORE.runs).get(row.run_id);
     if (run && !EXCLUDED_FROM_COMPARISON.has(run.sync.state)) eligible.push(row);
   }
+  await tx.done;
   return eligible;
 }
 
@@ -139,7 +146,18 @@ export interface IdentityConflictGroup {
  * detection only, never auto-merges or mutates anything.
  */
 export async function findIdentityConflicts(db: N200Database): Promise<IdentityConflictGroup[]> {
-  const rows = await db.getAll(STORE.comparisonIdentity);
+  // Same single-transaction, same state filter as queryComparisonIndexByIdentity (security
+  // review P1-C) — this feeds a "surface for review" decision, so it must never leak rows
+  // belonging to a run this app isn't currently treating as active/resolvable.
+  const tx = db.transaction([STORE.comparisonIdentity, STORE.runs], 'readonly');
+  const allRows = await tx.objectStore(STORE.comparisonIdentity).getAll();
+  const rows: ComparisonIdentityRecord[] = [];
+  for (const row of allRows) {
+    const run = await tx.objectStore(STORE.runs).get(row.run_id);
+    if (run && !EXCLUDED_FROM_COMPARISON.has(run.sync.state)) rows.push(row);
+  }
+  await tx.done;
+
   const byNseCode = new Map<string, ComparisonIdentityRecord[]>();
   for (const row of rows) {
     if (row.normalized_nse_code === null) continue;
