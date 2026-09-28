@@ -4,6 +4,7 @@ import { buildEnvelope } from '../../src/core/envelope/build';
 import {
   findIdentityConflicts,
   isinIdentityKey,
+  listComparisonIdentityGroups,
   nseIdentityKey,
   queryComparisonIndexByIdentity,
 } from '../../src/core/storage/comparisonIndex';
@@ -159,6 +160,100 @@ describe('comparison-identity index: derived from envelopes on commit', () => {
         }))
         .sort((a, b) => a.row_index - b.row_index),
     );
+  });
+});
+
+describe('Step 5B: listComparisonIdentityGroups (stock-picker source)', () => {
+  it('groups occurrences by identity_key across runs, keeping ISIN-matched and NSE-only-matched keys distinct even for the same stock', async () => {
+    const runId = crypto.randomUUID();
+    const envelope = await buildFrom('SYNTHETIC_missing_identifiers.csv', runId);
+    await commitNewRun(db, envelope);
+
+    const groups = await listComparisonIdentityGroups(db);
+    const nseGroup = groups.find((g) => g.identity_key === nseIdentityKey('SYNA'));
+    expect(nseGroup).toMatchObject({ match_method: 'nse_code_provisional', normalized_isin: null });
+    expect(nseGroup?.records.map((r) => r.run_id)).toEqual([runId]);
+
+    const isinGroup = groups.find((g) => g.identity_key === isinIdentityKey('ZZSYNTH00056'));
+    expect(isinGroup).toMatchObject({ match_method: 'isin', normalized_isin: 'ZZSYNTH00056' });
+  });
+
+  it('a later run supplying an ISIN for what looks like the same stock never merges into an older NSE-only identity_key', async () => {
+    const nseOnlyBytes = buildCsv([
+      SYNTHETIC_HEADER,
+      ['1', 'Synthetic Later-ISIN', '', '1500', '1000', 'SYNLATER', ''],
+    ]);
+    const isinLaterBytes = buildCsv([
+      SYNTHETIC_HEADER,
+      ['1', 'Synthetic Later-ISIN', '', '1500', '1000', 'SYNLATER', 'ZZSYNTH00015'],
+    ]);
+    const older = await buildEnvelope({
+      originalBytes: nseOnlyBytes,
+      analysis: (() => {
+        const a = analyzeCsvBytes(nseOnlyBytes);
+        if (!a.ok || !a.canConfirm) throw new Error('unexpected');
+        return a;
+      })(),
+      originalFilename: 'older.csv',
+      originalFileMimeType: 'text/csv',
+      effectiveDate: '2026-01-01',
+    });
+    const later = await buildEnvelope({
+      originalBytes: isinLaterBytes,
+      analysis: (() => {
+        const a = analyzeCsvBytes(isinLaterBytes);
+        if (!a.ok || !a.canConfirm) throw new Error('unexpected');
+        return a;
+      })(),
+      originalFilename: 'later.csv',
+      originalFileMimeType: 'text/csv',
+      effectiveDate: '2026-02-01',
+    });
+    if (!older.ok || !later.ok) throw new Error('build failed');
+    await commitNewRun(db, older.envelope);
+    await commitNewRun(db, later.envelope);
+
+    const groups = await listComparisonIdentityGroups(db);
+    const nseGroup = groups.find((g) => g.identity_key === nseIdentityKey('SYNLATER'));
+    const isinGroup = groups.find((g) => g.identity_key === isinIdentityKey('ZZSYNTH00015'));
+    // Two entirely separate identity_key groups — the NSE-only group is NOT retroactively
+    // absorbed into or aliased by the later ISIN-matched group, even though it's the same NSE
+    // Code and stock name.
+    expect(nseGroup?.records.map((r) => r.run_id)).toEqual([older.envelope.run_id]);
+    expect(isinGroup?.records.map((r) => r.run_id)).toEqual([later.envelope.run_id]);
+  });
+
+  it('excludes a conflict/quarantined/unsupported_schema run and re-includes it once restored, without any index rebuild', async () => {
+    const envelope = await buildFrom('SYNTHETIC_crlf_final_newline.csv', crypto.randomUUID());
+    await commitNewRun(db, envelope);
+    const key = isinIdentityKey('ZZSYNTH00015');
+
+    expect(
+      (await listComparisonIdentityGroups(db)).find((g) => g.identity_key === key)?.records ?? [],
+    ).not.toEqual([]);
+
+    await applyTransition(db, envelope.run_id, { type: 'QUARANTINE' });
+    expect(
+      (await listComparisonIdentityGroups(db)).find((g) => g.identity_key === key),
+    ).toBeUndefined();
+  });
+
+  it('never deletes or mutates the underlying index rows — filtering is applied fresh at query time', async () => {
+    const envelope = await buildFrom('SYNTHETIC_crlf_final_newline.csv', crypto.randomUUID());
+    await commitNewRun(db, envelope);
+    await applyTransition(db, envelope.run_id, { type: 'QUARANTINE' });
+
+    const rawRows = await db.getAllFromIndex(
+      STORE.comparisonIdentity,
+      COMPARISON_BY_RUN_ID,
+      envelope.run_id,
+    );
+    expect(rawRows.length).toBeGreaterThan(0);
+    expect(
+      (await listComparisonIdentityGroups(db)).find(
+        (g) => g.identity_key === isinIdentityKey('ZZSYNTH00015'),
+      ),
+    ).toBeUndefined();
   });
 });
 

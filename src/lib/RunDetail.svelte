@@ -2,6 +2,7 @@
   import {
     buildRunTableColumns,
     identityDisplayText,
+    identityKeyForIdentity,
     projectRunRows,
     rawCellDisplayText,
     sortByColumn,
@@ -18,6 +19,7 @@
     type RunRecord,
   } from '../core/storage';
   import { describeVolumeRatio } from './importMessages';
+  import { compareHash } from './route';
 
   interface Props {
     db: N200Database;
@@ -196,7 +198,14 @@
                     {:else if col.role.role === 'sourceRow'}
                       {row.sourceRowNumber}
                     {:else if col.role.role === 'identity'}
-                      {identityDisplayText(row.identity)}
+                      {#if identityKeyForIdentity(row.identity) !== null}
+                        <a href={compareHash(identityKeyForIdentity(row.identity))}
+                          >{identityDisplayText(row.identity)}
+                          <span class="visually-hidden">(compare across runs)</span></a
+                        >
+                      {:else}
+                        {identityDisplayText(row.identity)}
+                      {/if}
                     {:else if col.role.role === 'appVolumeRatio'}
                       {describeVolumeRatio(row.volumeRatio)}
                     {:else}

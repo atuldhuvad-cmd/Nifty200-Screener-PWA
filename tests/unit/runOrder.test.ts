@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { compareRunsForHistory, sortRunsForHistory } from '../../src/core/display/runOrder';
+import {
+  compareRunsChronologically,
+  compareRunsForHistory,
+  sortRunsChronologically,
+  sortRunsForHistory,
+} from '../../src/core/display/runOrder';
 import { initialSyncRecord } from '../../src/core/storage/types';
 import type { RunRecord } from '../../src/core/storage/types';
 import { buildTestEnvelope } from '../storage-helpers';
@@ -127,5 +132,83 @@ describe('compareRunsForHistory / sortRunsForHistory (Views §1 default order)',
     expect(compareRunsForHistory(a, b) > 0).toBe(true);
     expect(compareRunsForHistory(b, a) < 0).toBe(true);
     expect(compareRunsForHistory(a, a)).toBe(0);
+  });
+});
+
+describe('compareRunsChronologically / sortRunsChronologically (Step 5B default comparison chronology)', () => {
+  it('orders by effective_date ascending first (oldest-first historical progression)', async () => {
+    const older = await run({
+      runId: '11111111-1111-4111-8111-111111111111',
+      effectiveDate: '2026-01-01',
+      importedAt: '2026-01-01T00:00:00.000Z',
+    });
+    const newer = await run({
+      runId: '22222222-2222-4222-8222-222222222222',
+      effectiveDate: '2026-02-01',
+      importedAt: '2026-01-01T00:00:00.000Z',
+    });
+    expect(sortRunsChronologically([newer, older]).map((r) => r.run_id)).toEqual([
+      older.run_id,
+      newer.run_id,
+    ]);
+  });
+
+  it('falls back to imported_at ascending when effective_date ties, keeping same-date runs distinct', async () => {
+    const earlyImport = await run({
+      runId: '11111111-1111-4111-8111-111111111111',
+      effectiveDate: '2026-01-01',
+      importedAt: '2026-01-01T08:00:00.000Z',
+    });
+    const lateImport = await run({
+      runId: '22222222-2222-4222-8222-222222222222',
+      effectiveDate: '2026-01-01',
+      importedAt: '2026-01-01T09:00:00.000Z',
+    });
+    const sorted = sortRunsChronologically([lateImport, earlyImport]);
+    expect(sorted.map((r) => r.run_id)).toEqual([earlyImport.run_id, lateImport.run_id]);
+    expect(new Set(sorted.map((r) => r.run_id)).size).toBe(2);
+  });
+
+  it('falls back to run_id ascending as the final tiebreaker', async () => {
+    const sameInstant = '2026-01-01T09:00:00.000Z';
+    const a = await run({
+      runId: 'bbbbbbbb-1111-4111-8111-111111111111',
+      effectiveDate: '2026-01-01',
+      importedAt: sameInstant,
+    });
+    const b = await run({
+      runId: 'aaaaaaaa-2222-4222-8222-222222222222',
+      effectiveDate: '2026-01-01',
+      importedAt: sameInstant,
+    });
+    expect(sortRunsChronologically([a, b]).map((r) => r.run_id)).toEqual([b.run_id, a.run_id]);
+  });
+
+  it('is the exact mirror of compareRunsForHistory (same tiebreak convention, opposite date direction)', async () => {
+    const a = await run({
+      runId: '11111111-1111-4111-8111-111111111111',
+      effectiveDate: '2026-01-01',
+      importedAt: '2026-01-01T00:00:00.000Z',
+    });
+    const b = await run({
+      runId: '22222222-2222-4222-8222-222222222222',
+      effectiveDate: '2026-02-01',
+      importedAt: '2026-01-01T00:00:00.000Z',
+    });
+    expect(compareRunsChronologically(a, b)).toBe(-compareRunsForHistory(a, b));
+    expect(compareRunsChronologically(a, a)).toBe(0);
+  });
+
+  it('sorts a run with an unsupported schema after every supported run, ordered by run_id among themselves', async () => {
+    const supported = await run({
+      runId: '11111111-1111-4111-8111-111111111111',
+      effectiveDate: '2020-01-01',
+      importedAt: '2020-01-01T00:00:00.000Z',
+    });
+    const unsupportedB = unsupported('bbbbbbbb-0000-4000-8000-000000000000');
+    const unsupportedA = unsupported('aaaaaaaa-0000-4000-8000-000000000000');
+    expect(
+      sortRunsChronologically([unsupportedB, supported, unsupportedA]).map((r) => r.run_id),
+    ).toEqual([supported.run_id, unsupportedA.run_id, unsupportedB.run_id]);
   });
 });

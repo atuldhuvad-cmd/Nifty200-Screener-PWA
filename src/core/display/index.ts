@@ -1,5 +1,21 @@
 export { normalizeForDisplay } from './normalizeForDisplay';
-export { compareRunsForHistory, sortRunsForHistory } from './runOrder';
+export {
+  compareRunsChronologically,
+  compareRunsForHistory,
+  sortRunsChronologically,
+  sortRunsForHistory,
+} from './runOrder';
+export {
+  buildComparisonPickerEntries,
+  buildComparisonResult,
+  identityKeyForIdentity,
+} from './comparison';
+export type {
+  ComparisonCell,
+  ComparisonPickerEntry,
+  ComparisonResult,
+  ComparisonRunColumn,
+} from './comparison';
 export { projectRunRows } from './runRows';
 export type { DisplayColumn, ProjectedRow, RunRowsProjection } from './runRows';
 export { buildRunTableColumns, identityDisplayText, rawCellDisplayText } from './runTable';

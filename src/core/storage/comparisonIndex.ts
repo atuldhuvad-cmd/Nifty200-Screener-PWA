@@ -145,6 +145,59 @@ export async function queryComparisonIndexByIdentity(
   return eligible;
 }
 
+/** One distinct stock identity (`identity_key`) and every eligible-run occurrence of it —
+ * exactly the shape Step 5B's stock picker and comparison view need, built from the existing
+ * derived index rather than a second identity-matching implementation. */
+export interface ComparisonIdentityGroup {
+  identity_key: string;
+  match_method: 'isin' | 'nse_code_provisional';
+  normalized_isin: string | null;
+  normalized_nse_code: string | null;
+  /** Every occurrence (one per row that matched this identity) across every currently-eligible
+   * run, in no particular order — callers needing a specific run's occurrence look it up by
+   * `run_id`. Never mutated or persisted; rebuilt fresh on every call. */
+  records: ComparisonIdentityRecord[];
+}
+
+/**
+ * Enumerates every distinct stock identity with at least one occurrence in a currently-eligible
+ * run (Step 5B's stock picker: "build from the existing rebuildable `comparison_identity`
+ * index, not from stock names"). Same eligible-run state filter, same one-transaction snapshot,
+ * and the same "never delete or mutate index rows" posture as `queryComparisonIndexByIdentity`/
+ * `findIdentityConflicts` — a run that later moves out of `conflict`/`quarantined`/
+ * `unsupported_schema` reappears here on the next call with no rebuild, and one that moves into
+ * one of those states disappears the same way.
+ */
+export async function listComparisonIdentityGroups(
+  db: N200Database,
+): Promise<ComparisonIdentityGroup[]> {
+  const tx = db.transaction([STORE.comparisonIdentity, STORE.runs], 'readonly');
+  const allRows = await tx.objectStore(STORE.comparisonIdentity).getAll();
+  const eligible: ComparisonIdentityRecord[] = [];
+  for (const row of allRows) {
+    const run = await tx.objectStore(STORE.runs).get(row.run_id);
+    if (run && !EXCLUDED_FROM_COMPARISON.has(run.sync.state)) eligible.push(row);
+  }
+  await tx.done;
+
+  const byKey = new Map<string, ComparisonIdentityGroup>();
+  for (const row of eligible) {
+    const existing = byKey.get(row.identity_key);
+    if (existing) {
+      existing.records.push(row);
+    } else {
+      byKey.set(row.identity_key, {
+        identity_key: row.identity_key,
+        match_method: row.match_method,
+        normalized_isin: row.normalized_isin,
+        normalized_nse_code: row.normalized_nse_code,
+        records: [row],
+      });
+    }
+  }
+  return [...byKey.values()];
+}
+
 export function isinIdentityKey(normalizedIsin: string): string {
   return identityKeyFor('isin', normalizedIsin);
 }

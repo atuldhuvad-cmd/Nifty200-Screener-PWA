@@ -11,9 +11,10 @@
   import { getDatabase } from './lib/db';
   import ImportForm from './lib/ImportForm.svelte';
   import MultipartImportForm from './lib/MultipartImportForm.svelte';
+  import RunComparison from './lib/RunComparison.svelte';
   import RunDetail from './lib/RunDetail.svelte';
   import RunHistory from './lib/RunHistory.svelte';
-  import { parseRunIdFromHash } from './lib/route';
+  import { compareHash, parseCompareRouteFromHash, parseRunIdFromHash } from './lib/route';
   import StatusBar from './lib/StatusBar.svelte';
 
   type ImportMode = 'single' | 'multipart';
@@ -28,6 +29,9 @@
   let initError = $state<string | undefined>(undefined);
   let selectedRunId = $state<string | null>(
     typeof location === 'undefined' ? null : parseRunIdFromHash(location.hash),
+  );
+  let compareRoute = $state<{ identityKey: string | null } | null>(
+    typeof location === 'undefined' ? null : parseCompareRouteFromHash(location.hash),
   );
 
   async function refresh(database: N200Database): Promise<void> {
@@ -54,6 +58,7 @@
 
     const onHashChange = (): void => {
       selectedRunId = parseRunIdFromHash(location.hash);
+      compareRoute = parseCompareRouteFromHash(location.hash);
     };
     window.addEventListener('hashchange', onHashChange);
     return () => {
@@ -73,58 +78,67 @@
 
   {#if initError}
     <p role="alert" class="n200-badge n200-badge--error">{initError}</p>
-  {:else if db && selectedRunId !== null}
-    <RunDetail {db} runId={selectedRunId} />
   {:else if db}
-    <StatusBar {singleTabWarning} {persist} {atRiskCount} />
+    <nav aria-label="Main">
+      <a href="#/">Run history</a>
+      <a href={compareHash()}>Compare stocks</a>
+    </nav>
 
-    <fieldset>
-      <legend>Import type</legend>
-      <div>
-        <input
-          id="import-mode-single"
-          type="radio"
-          name="import-mode"
-          value="single"
-          checked={importMode === 'single'}
-          onchange={() => {
-            importMode = 'single';
-          }}
-        />
-        <label for="import-mode-single">Single file</label>
-      </div>
-      <div>
-        <input
-          id="import-mode-multipart"
-          type="radio"
-          name="import-mode"
-          value="multipart"
-          checked={importMode === 'multipart'}
-          onchange={() => {
-            importMode = 'multipart';
-          }}
-        />
-        <label for="import-mode-multipart">Multipart export</label>
-      </div>
-    </fieldset>
-
-    {#if importMode === 'single'}
-      <ImportForm
-        {db}
-        onCommitted={() => {
-          if (db) void refresh(db);
-        }}
-      />
+    {#if compareRoute !== null}
+      <RunComparison {db} identityKey={compareRoute.identityKey} />
+    {:else if selectedRunId !== null}
+      <RunDetail {db} runId={selectedRunId} />
     {:else}
-      <MultipartImportForm
-        {db}
-        onCommitted={() => {
-          if (db) void refresh(db);
-        }}
-      />
-    {/if}
+      <StatusBar {singleTabWarning} {persist} {atRiskCount} />
 
-    <RunHistory {runs} />
+      <fieldset>
+        <legend>Import type</legend>
+        <div>
+          <input
+            id="import-mode-single"
+            type="radio"
+            name="import-mode"
+            value="single"
+            checked={importMode === 'single'}
+            onchange={() => {
+              importMode = 'single';
+            }}
+          />
+          <label for="import-mode-single">Single file</label>
+        </div>
+        <div>
+          <input
+            id="import-mode-multipart"
+            type="radio"
+            name="import-mode"
+            value="multipart"
+            checked={importMode === 'multipart'}
+            onchange={() => {
+              importMode = 'multipart';
+            }}
+          />
+          <label for="import-mode-multipart">Multipart export</label>
+        </div>
+      </fieldset>
+
+      {#if importMode === 'single'}
+        <ImportForm
+          {db}
+          onCommitted={() => {
+            if (db) void refresh(db);
+          }}
+        />
+      {:else}
+        <MultipartImportForm
+          {db}
+          onCommitted={() => {
+            if (db) void refresh(db);
+          }}
+        />
+      {/if}
+
+      <RunHistory {runs} />
+    {/if}
   {:else}
     <p>Opening local storage&hellip;</p>
   {/if}

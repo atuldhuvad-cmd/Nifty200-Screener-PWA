@@ -42,6 +42,41 @@ export const FIXTURE_RUN_HISTORY_MULTIPART_2 = join(
   'synthetic',
   'SYNTHETIC_run_history_multipart_2.csv',
 );
+export const FIXTURE_5B_SYMBOL_HISTORY_RUN1 = join(
+  ROOT,
+  'tests',
+  'fixtures',
+  'synthetic',
+  'SYNTHETIC_5b_symbol_history_run1.csv',
+);
+export const FIXTURE_5B_SYMBOL_HISTORY_RUN2 = join(
+  ROOT,
+  'tests',
+  'fixtures',
+  'synthetic',
+  'SYNTHETIC_5b_symbol_history_run2.csv',
+);
+export const FIXTURE_5B_NSE_ONLY_EARLY = join(
+  ROOT,
+  'tests',
+  'fixtures',
+  'synthetic',
+  'SYNTHETIC_5b_nse_only_early.csv',
+);
+export const FIXTURE_5B_ISIN_APPEARS_LATER = join(
+  ROOT,
+  'tests',
+  'fixtures',
+  'synthetic',
+  'SYNTHETIC_5b_isin_appears_later.csv',
+);
+export const FIXTURE_5B_CONFLICT = join(
+  ROOT,
+  'tests',
+  'fixtures',
+  'synthetic',
+  'SYNTHETIC_5b_conflict.csv',
+);
 
 export async function chooseFile(page: Page, path: string): Promise<void> {
   await page.getByLabel('Choose a Nifty 200 CSV file').setInputFiles(path);
