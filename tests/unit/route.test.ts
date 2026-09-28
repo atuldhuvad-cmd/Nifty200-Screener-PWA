@@ -27,6 +27,38 @@ describe('route: hash <-> run id', () => {
   });
 });
 
+describe('route: malformed percent-encoding fails safely, never throws (review finding)', () => {
+  it.each(['%', '%2', '%GG', 'abc%', 'valid-prefix%2', 'valid-prefix%zz'])(
+    'parseRunIdFromHash returns null instead of throwing for #/run/%s',
+    (segment) => {
+      expect(() => parseRunIdFromHash(`#/run/${segment}`)).not.toThrow();
+      expect(parseRunIdFromHash(`#/run/${segment}`)).toBeNull();
+    },
+  );
+
+  it.each(['%', '%2', '%GG', 'abc%', 'valid-prefix%2', 'valid-prefix%zz'])(
+    'parseCompareRouteFromHash returns null instead of throwing for #/compare/%s',
+    (segment) => {
+      expect(() => parseCompareRouteFromHash(`#/compare/${segment}`)).not.toThrow();
+      expect(parseCompareRouteFromHash(`#/compare/${segment}`)).toBeNull();
+    },
+  );
+
+  it('never partially decodes, repairs, or guesses a malformed value', () => {
+    // A guess/repair would return something like 'valid-prefix' or 'valid-prefix%2' verbatim;
+    // the only acceptable outcomes are null (route.ts) or a value that round-trips exactly.
+    expect(parseRunIdFromHash('#/run/valid-prefix%2')).toBeNull();
+    expect(parseCompareRouteFromHash('#/compare/valid-prefix%2')).toBeNull();
+  });
+
+  it('a well-formed value adjacent to these cases still decodes normally (no over-broad rejection)', () => {
+    expect(parseRunIdFromHash('#/run/valid-prefix%2Fsuffix')).toBe('valid-prefix/suffix');
+    expect(parseCompareRouteFromHash('#/compare/isin%3AZZSYNTH00015')).toEqual({
+      identityKey: 'isin:ZZSYNTH00015',
+    });
+  });
+});
+
 describe('route: hash <-> comparison view (Step 5B)', () => {
   it('parses the picker-only route (#/compare) with a null identityKey', () => {
     expect(parseCompareRouteFromHash('#/compare')).toEqual({ identityKey: null });

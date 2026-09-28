@@ -321,3 +321,56 @@ describe('buildComparisonPickerEntries', () => {
     ).toBeUndefined();
   });
 });
+
+describe('buildComparisonResult: an eligible header-only (empty) run (review finding)', () => {
+  it('gives the selected stock exactly one absent cell for a header-only run, never zero or an invalid-metric reason, with chronological position preserved', async () => {
+    const present = await buildTestEnvelope({
+      runId: '11111111-1111-4111-8111-111111111111',
+      effectiveDate: '2026-01-01',
+      fixture: 'SYNTHETIC_crlf_final_newline.csv', // row 0 is ZZSYNTH00015
+    });
+
+    // A header-only CSV: zero data rows, so zero comparison_identity records for any identity —
+    // an eligible run in every other respect (schema-valid, committable, `pending` state).
+    const headerOnlyBytes = buildCsv([SYNTHETIC_HEADER]);
+    const headerOnlyAnalysis = analyzeCsvBytes(headerOnlyBytes);
+    if (!headerOnlyAnalysis.ok || !headerOnlyAnalysis.canConfirm) throw new Error('unexpected');
+    const headerOnlyBuilt = await buildEnvelope({
+      originalBytes: headerOnlyBytes,
+      analysis: headerOnlyAnalysis,
+      originalFilename: 'empty.csv',
+      originalFileMimeType: 'text/csv',
+      effectiveDate: '2026-02-01',
+      runId: '22222222-2222-4222-8222-222222222222',
+    });
+    if (!headerOnlyBuilt.ok) throw new Error('build failed');
+    const headerOnly = headerOnlyBuilt.envelope;
+    expect(headerOnly.stock_count).toBe(0);
+
+    const runs = [toRunRecord(present), toRunRecord(headerOnly)];
+    const group = {
+      identity_key: isinIdentityKey('ZZSYNTH00015'),
+      match_method: 'isin' as const,
+      normalized_isin: 'ZZSYNTH00015',
+      normalized_nse_code: null,
+      // No record at all for the header-only run: it never produced a comparison_identity row.
+      records: [comparisonRecord(present.run_id, 0, 'isin', 'ZZSYNTH00015', 'SYNA')],
+    };
+
+    const result = buildComparisonResult(group, runs);
+
+    // Exactly one comparison cell for the empty run (not zero, not more than one).
+    const emptyRunCells = result.cells.filter((c) => c.runId === headerOnly.run_id);
+    expect(emptyRunCells).toHaveLength(1);
+    const [emptyRunCell] = emptyRunCells;
+    expect(emptyRunCell?.status).toBe('absent');
+    // An absent cell carries no `row`/`stockName`/metric at all — never a zero value and never
+    // an invalid-metric reason code, which would wrongly imply the stock was present.
+    expect(emptyRunCell).toEqual({ status: 'absent', runId: headerOnly.run_id });
+
+    // Chronological position preserved: the header-only run (2026-02-01) sorts after the
+    // present one (2026-01-01), oldest first — not dropped, not reordered.
+    expect(result.runs.map((r) => r.runId)).toEqual([present.run_id, headerOnly.run_id]);
+    expect(result.cells.map((c) => c.runId)).toEqual([present.run_id, headerOnly.run_id]);
+  });
+});

@@ -188,8 +188,14 @@ test.describe('Step 5B: longitudinal stock comparison', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'Compare a stock across runs' })).toBeVisible();
 
-    await page.getByLabel('Choose a stock to compare').focus();
-    await selectStock(page, /LG Electronics/);
+    // Real keyboard interaction with the native <select>, not Playwright's selectOption()
+    // shortcut: focus it, then use the browser's own type-ahead search (typing a prefix jumps
+    // to the first matching option and fires a real 'change' event) — verified to work
+    // identically in both Chromium and Microsoft Edge before writing this test.
+    const stockPicker = page.getByLabel('Choose a stock to compare');
+    await stockPicker.focus();
+    await page.keyboard.type('LG Electronics', { delay: 20 });
+    await expect(stockPicker).toHaveValue('isin:INE324D01010');
     await expect(page.getByRole('cell', { name: 'Present' })).toBeVisible();
 
     const backLink = page.getByRole('link', { name: 'Back to run history' });
