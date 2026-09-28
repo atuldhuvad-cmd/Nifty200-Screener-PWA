@@ -11,7 +11,9 @@
   import { getDatabase } from './lib/db';
   import ImportForm from './lib/ImportForm.svelte';
   import MultipartImportForm from './lib/MultipartImportForm.svelte';
-  import RunsList from './lib/RunsList.svelte';
+  import RunDetail from './lib/RunDetail.svelte';
+  import RunHistory from './lib/RunHistory.svelte';
+  import { parseRunIdFromHash } from './lib/route';
   import StatusBar from './lib/StatusBar.svelte';
 
   type ImportMode = 'single' | 'multipart';
@@ -24,6 +26,9 @@
   let atRiskCount = $state(0);
   let persist = $state<PersistPromptResult | undefined>(undefined);
   let initError = $state<string | undefined>(undefined);
+  let selectedRunId = $state<string | null>(
+    typeof location === 'undefined' ? null : parseRunIdFromHash(location.hash),
+  );
 
   async function refresh(database: N200Database): Promise<void> {
     runs = await getAllRuns(database);
@@ -46,6 +51,14 @@
         initError = e instanceof Error ? e.message : 'Failed to open local storage.';
       }
     })();
+
+    const onHashChange = (): void => {
+      selectedRunId = parseRunIdFromHash(location.hash);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => {
+      window.removeEventListener('hashchange', onHashChange);
+    };
   });
 </script>
 
@@ -60,6 +73,8 @@
 
   {#if initError}
     <p role="alert" class="n200-badge n200-badge--error">{initError}</p>
+  {:else if db && selectedRunId !== null}
+    <RunDetail {db} runId={selectedRunId} />
   {:else if db}
     <StatusBar {singleTabWarning} {persist} {atRiskCount} />
 
@@ -109,7 +124,7 @@
       />
     {/if}
 
-    <RunsList {runs} />
+    <RunHistory {runs} />
   {:else}
     <p>Opening local storage&hellip;</p>
   {/if}

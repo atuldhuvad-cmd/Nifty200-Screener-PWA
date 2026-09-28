@@ -21,6 +21,27 @@ export const FIXTURE_HEADER_ONLY = join(
   'synthetic',
   'SYNTHETIC_header_only.csv',
 );
+export const FIXTURE_CRLF_THREE_ROW = join(
+  ROOT,
+  'tests',
+  'fixtures',
+  'synthetic',
+  'SYNTHETIC_crlf_final_newline.csv',
+);
+export const FIXTURE_RUN_HISTORY_MULTIPART_1 = join(
+  ROOT,
+  'tests',
+  'fixtures',
+  'synthetic',
+  'SYNTHETIC_run_history_multipart_1.csv',
+);
+export const FIXTURE_RUN_HISTORY_MULTIPART_2 = join(
+  ROOT,
+  'tests',
+  'fixtures',
+  'synthetic',
+  'SYNTHETIC_run_history_multipart_2.csv',
+);
 
 export async function chooseFile(page: Page, path: string): Promise<void> {
   await page.getByLabel('Choose a Nifty 200 CSV file').setInputFiles(path);

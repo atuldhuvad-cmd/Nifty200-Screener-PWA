@@ -139,8 +139,15 @@ test('7. a real v1-shaped IndexedDB database upgrades to v2 on load', async ({ p
   await page.reload();
 
   // The app's real `openDatabase()` ran the v1 -> v2 migration; both runs are now visible.
-  await expect(page.getByText('2026-01-01')).toBeVisible();
-  await expect(page.getByText('2026-01-02')).toBeVisible();
+  // Scoped to the run-history table's cells (not a bare page-wide text search), since Step 5A's
+  // "Open" links also carry each run's date in their own visually-hidden accessible name.
+  const runHistoryTable = page.locator('table', { hasText: 'Sync state' });
+  await expect(
+    runHistoryTable.getByRole('cell', { name: '2026-01-01', exact: true }),
+  ).toBeVisible();
+  await expect(
+    runHistoryTable.getByRole('cell', { name: '2026-01-02', exact: true }),
+  ).toBeVisible();
 
   const result = await page.evaluate(
     async ({ dbName, syncedRunId, errorRunId }) => {

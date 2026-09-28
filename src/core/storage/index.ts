@@ -19,6 +19,13 @@ export type { LockOutcome } from './locks';
 export { countAtRiskRuns, requestPersistentStorage } from './persistence';
 export type { PersistPromptResult } from './persistence';
 export {
+  isEnvelopeV1,
+  isEnvelopeV2,
+  isRunAtRisk,
+  isRunOpenable,
+  isSupportedEnvelope,
+} from './runStatus';
+export {
   applyTransition,
   commitNewRun,
   findRunsByExactSourceHashSet,
