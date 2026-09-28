@@ -1,4 +1,5 @@
 import { getAllRuns } from './runs';
+import { isRunAtRisk } from './runStatus';
 import type { N200Database } from './schema';
 
 export type PersistPromptResult = { supported: false } | { supported: true; granted: boolean };
@@ -30,9 +31,5 @@ export async function requestPersistentStorage(): Promise<PersistPromptResult> {
  */
 export async function countAtRiskRuns(db: N200Database): Promise<number> {
   const runs = await getAllRuns(db);
-  return runs.filter((r) => {
-    const { state, diagnostics } = r.sync;
-    if (state === 'quarantined' || state === 'unsupported_schema') return false;
-    return !diagnostics.has_verified_remote_copy;
-  }).length;
+  return runs.filter(isRunAtRisk).length;
 }

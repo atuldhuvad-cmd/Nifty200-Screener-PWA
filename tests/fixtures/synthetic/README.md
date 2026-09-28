@@ -28,5 +28,6 @@ The files are byte-exact inputs. `.gitattributes` disables line-ending conversio
 | `SYNTHETIC_duplicate_blank_headers.csv` | Duplicate and blank headers are preserved, with warnings |
 | `SYNTHETIC_unclosed_quote.csv`, `SYNTHETIC_ragged_rows.csv`, `SYNTHETIC_bare_cr_line_endings.csv` | Syntax errors |
 | `SYNTHETIC_invalid_utf8.csv`, `SYNTHETIC_utf16le_bom.csv` | Encoding rejection |
+| `SYNTHETIC_run_history_multipart_1.csv`, `SYNTHETIC_run_history_multipart_2.csv` | Step 5A: a two-part multipart run whose parts deliberately reorder their headers differently, with combined Volume Ratios 0.900 / 2.000 / 9.000 / 10.000 (proving numeric, not lexicographic, ordering end to end) |
 
 The oversized-input and page-size cases are generated inside the tests rather than stored here, to keep the repository small.

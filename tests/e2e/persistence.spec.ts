@@ -11,7 +11,7 @@ test('6. a committed run remains visible after reload', async ({ page }) => {
   await page.reload();
 
   const runsTable = page.locator('table', { hasText: 'Sync state' });
-  await expect(runsTable.getByRole('cell', { name: '2026-09-27' })).toBeVisible();
+  await expect(runsTable.getByRole('cell', { name: '2026-09-27', exact: true })).toBeVisible();
   await expect(runsTable.getByRole('cell', { name: '7', exact: true })).toBeVisible();
   await expect(page.getByText('No runs have been committed yet.')).toHaveCount(0);
 });

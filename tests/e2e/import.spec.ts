@@ -24,7 +24,7 @@ test.describe('Step 4 import flow', () => {
     await expect(page.getByText(/Committed run for 2026-09-27 \(7 stocks\)/)).toBeVisible();
     const runsTable = page.locator('table', { hasText: 'Sync state' });
     await expect(runsTable.getByRole('cell', { name: '7', exact: true })).toBeVisible();
-    await expect(runsTable.getByRole('cell', { name: '2026-09-27' })).toBeVisible();
+    await expect(runsTable.getByRole('cell', { name: '2026-09-27', exact: true })).toBeVisible();
   });
 
   test('2. cancel leaves storage empty', async ({ page }) => {
