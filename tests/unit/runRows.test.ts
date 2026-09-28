@@ -27,16 +27,55 @@ describe('projectRunRows: v1', () => {
     });
   });
 
-  it('recomputes identity and volume_ratio_v1 from the raw cells (never read back from the envelope, since v1 stores neither)', async () => {
+  it('reads volume_ratio_v1 from the envelope’s stored computed_metrics, and derives identity from the raw ISIN/NSE Code cells', async () => {
     const envelope = await buildTestEnvelope({ fixture: 'SYNTHETIC_crlf_final_newline.csv' });
     const projection = projectRunRows(envelope);
     // SYNTHETIC_crlf_final_newline.csv: Alpha 1500/1000=1.500, Beta 1000/2000=0.500, Gamma 1000/500=2.000
+    // These match envelope.computed_metrics.volume_ratio_v1 exactly (asserted below) — the
+    // stored-vs-recomputed distinction is what the "reads the stored metric, not a recomputed
+    // one" test further down proves with a deliberately altered stored value.
     expect(
       projection.rows.map((r) => (r.volumeRatio.status === 'valid' ? r.volumeRatio.value : null)),
     ).toEqual(['1.500', '0.500', '2.000']);
+    expect(projection.rows.map((r) => r.volumeRatio)).toEqual(
+      envelope.computed_metrics.volume_ratio_v1,
+    );
     for (const row of projection.rows) {
       expect(row.identity.match_method).toBe('isin');
     }
+  });
+
+  it('reads the stored volume_ratio_v1 metric, not a value recomputed from raw cells (regression: Step 5A review finding)', async () => {
+    const envelope = await buildTestEnvelope({ fixture: 'SYNTHETIC_crlf_final_newline.csv' });
+    const original = envelope.computed_metrics.volume_ratio_v1;
+    const [first, ...rest] = original;
+    if (first === undefined || first.status !== 'valid')
+      throw new Error('fixture assumption changed');
+    // Deliberately altered in-memory stored metric: recomputing from Alpha's raw cells
+    // (1500/1000) would give "1.500", never "9.999" — so if the projection ever shows
+    // "9.999" here, it can only have come from reading `computed_metrics`, not from
+    // `computeVolumeRatio()`. This altered envelope is a view-layer test fixture only: it is
+    // never passed through `validateEnvelope` and never persisted as if it were a real,
+    // integrity-checked run.
+    const tampered = {
+      ...envelope,
+      computed_metrics: {
+        volume_ratio_v1: [{ ...first, value: '9.999' }, ...rest],
+      },
+    };
+    const projection = projectRunRows(tampered);
+    expect(projection.rows[0]?.volumeRatio).toEqual({ ...first, value: '9.999' });
+    // Identity is unaffected by the altered metric: still derived from the raw ISIN cell.
+    expect(projection.rows[0]?.identity.match_method).toBe('isin');
+  });
+
+  it('fails explicitly, rather than recomputing, when a stored metric is missing at a row’s index', async () => {
+    const envelope = await buildTestEnvelope({ fixture: 'SYNTHETIC_crlf_final_newline.csv' });
+    const tampered = {
+      ...envelope,
+      computed_metrics: { volume_ratio_v1: envelope.computed_metrics.volume_ratio_v1.slice(0, 1) },
+    };
+    expect(() => projectRunRows(tampered)).toThrow(/no stored volume_ratio_v1 at index/);
   });
 
   it('never merges the provider VolumeRatio column into the computed metric', async () => {
@@ -178,5 +217,29 @@ describe('projectRunRows: v2 (multipart)', () => {
     const before = JSON.parse(JSON.stringify(envelope)) as unknown;
     projectRunRows(envelope);
     expect(envelope).toEqual(before);
+  });
+
+  it('reads volume_ratio_v1 by combined-row index from computed_metrics, not recomputed from raw cells (regression: Step 5A review finding)', async () => {
+    const envelope = await buildTestMultipartEnvelope({
+      parts: [
+        { fixtureBytes: partABytes, filename: 'part-a.csv' },
+        { fixtureBytes: partBBytes, filename: 'part-b.csv' },
+      ],
+    });
+    const original = envelope.computed_metrics.volume_ratio_v1;
+    const [first, ...rest] = original;
+    if (first === undefined || first.status !== 'valid')
+      throw new Error('fixture assumption changed');
+    // combined_row_refs[0] is part A's Alpha row (2000/1000 -> "2.000" if ever recomputed);
+    // the deliberately altered stored value at that same combined-row index must win.
+    const tampered = {
+      ...envelope,
+      computed_metrics: {
+        volume_ratio_v1: [{ ...first, value: '9.999' }, ...rest],
+      },
+    };
+    const projection = projectRunRows(tampered);
+    expect(projection.rows[0]?.volumeRatio).toEqual({ ...first, value: '9.999' });
+    expect(projection.rows[0]?.identity.normalized_isin).toBe('ZZSYNTH00015');
   });
 });
