@@ -55,3 +55,12 @@ export function compareHash(identityKey?: string | null): string {
 export function historyHash(): string {
   return '#/';
 }
+
+/** Step 6: the backup export/import view. No dynamic segment — a plain, static route. */
+export function backupHash(): string {
+  return '#/backup';
+}
+
+export function isBackupRoute(hash: string): boolean {
+  return hash === '#/backup';
+}

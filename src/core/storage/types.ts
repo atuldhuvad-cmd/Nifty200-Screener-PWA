@@ -81,7 +81,10 @@ export type VariantSource = 'remote' | 'backup_import' | 'manual_recovery';
 export interface RunVariantRecord {
   run_id: string;
   envelope_sha256: string;
-  envelope: RunEnvelopeV1;
+  /** A divergent copy of either a v1 or v2 canonical run (Step 6: backup import can produce a
+   * v2/multipart variant, same as a v1 one — this was previously typed v1-only, a pre-existing
+   * gap never exercised because nothing ingested a v2 envelope through this path before). */
+  envelope: RunEnvelopeV1 | RunEnvelopeV2;
   source: VariantSource;
   discovered_at: string;
 }

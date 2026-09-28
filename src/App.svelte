@@ -8,13 +8,20 @@
     type PersistPromptResult,
     type RunRecord,
   } from './core/storage';
+  import Backup from './lib/Backup.svelte';
   import { getDatabase } from './lib/db';
   import ImportForm from './lib/ImportForm.svelte';
   import MultipartImportForm from './lib/MultipartImportForm.svelte';
   import RunComparison from './lib/RunComparison.svelte';
   import RunDetail from './lib/RunDetail.svelte';
   import RunHistory from './lib/RunHistory.svelte';
-  import { compareHash, parseCompareRouteFromHash, parseRunIdFromHash } from './lib/route';
+  import {
+    backupHash,
+    compareHash,
+    isBackupRoute,
+    parseCompareRouteFromHash,
+    parseRunIdFromHash,
+  } from './lib/route';
   import StatusBar from './lib/StatusBar.svelte';
 
   type ImportMode = 'single' | 'multipart';
@@ -32,6 +39,9 @@
   );
   let compareRoute = $state<{ identityKey: string | null } | null>(
     typeof location === 'undefined' ? null : parseCompareRouteFromHash(location.hash),
+  );
+  let onBackupRoute = $state(
+    typeof location === 'undefined' ? false : isBackupRoute(location.hash),
   );
 
   async function refresh(database: N200Database): Promise<void> {
@@ -59,6 +69,7 @@
     const onHashChange = (): void => {
       selectedRunId = parseRunIdFromHash(location.hash);
       compareRoute = parseCompareRouteFromHash(location.hash);
+      onBackupRoute = isBackupRoute(location.hash);
     };
     window.addEventListener('hashchange', onHashChange);
     return () => {
@@ -82,9 +93,17 @@
     <nav aria-label="Main">
       <a href="#/">Run history</a>
       <a href={compareHash()}>Compare stocks</a>
+      <a href={backupHash()}>Backup</a>
     </nav>
 
-    {#if compareRoute !== null}
+    {#if onBackupRoute}
+      <Backup
+        {db}
+        onImported={() => {
+          if (db) void refresh(db);
+        }}
+      />
+    {:else if compareRoute !== null}
       <RunComparison {db} identityKey={compareRoute.identityKey} />
     {:else if selectedRunId !== null}
       <RunDetail {db} runId={selectedRunId} />

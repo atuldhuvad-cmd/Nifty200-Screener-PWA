@@ -11,8 +11,8 @@ export type {
   IdentityConflictEntry,
   IdentityConflictGroup,
 } from './comparisonIndex';
-export type { IngestOutcome } from './ingest';
-export { ingestEnvelopeBytes } from './ingest';
+export type { IngestOutcome, ParsedCandidate, RoutingDecision } from './ingest';
+export { decideRouting, ingestEnvelopeBytes, parseIngestCandidate } from './ingest';
 export { REDACTED, sanitizeQuarantineDiscoveryMetadata } from './sanitizeDiscoveryMetadata';
 export {
   isWebLocksAvailable,

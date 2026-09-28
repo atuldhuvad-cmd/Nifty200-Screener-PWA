@@ -4,8 +4,8 @@ import type { RunEnvelopeV1 } from '../../src/core/envelope/types';
 import { ingestEnvelopeBytes } from '../../src/core/storage/ingest';
 import { commitNewRun, getRun } from '../../src/core/storage/runs';
 import { openDatabase, STORE, type N200Database } from '../../src/core/storage/schema';
-import { withoutKey } from '../helpers';
-import { buildTestEnvelope, freshDbName } from '../storage-helpers';
+import { synthetic, withoutKey } from '../helpers';
+import { buildTestEnvelope, buildTestMultipartEnvelope, freshDbName } from '../storage-helpers';
 
 let db: N200Database;
 
@@ -93,6 +93,51 @@ describe('ingestEnvelopeBytes: valid envelopes', () => {
       const variant = await db.get(STORE.runVariants, [canonical.run_id, hash]);
       expect(variant?.source).toBe(expectedVariantSource);
     }
+  });
+});
+
+describe('ingestEnvelopeBytes: v2 (multipart) envelopes are ingested exactly like v1 (Step 6 fix)', () => {
+  // Pre-existing gap: this branch used to hard-cast to RunEnvelopeV1 and RunVariantRecord.envelope
+  // was typed v1-only, so a v2 envelope was never exercised through this path before Step 6.
+  // Disjoint by ISIN (Step 5A's fixture pair) — most SYNTHETIC_* fixtures reuse the same small
+  // ZZSYNTH ISIN pool and would otherwise trip the cross-part DUPLICATE_ISIN_ACROSS_PARTS block.
+  const twoParts = [
+    { fixtureBytes: synthetic('SYNTHETIC_run_history_multipart_1.csv'), filename: 'part-a.csv' },
+    { fixtureBytes: synthetic('SYNTHETIC_run_history_multipart_2.csv'), filename: 'part-b.csv' },
+  ];
+
+  it('a new, schema-valid v2 envelope commits to runs as pending', async () => {
+    const envelope = await buildTestMultipartEnvelope({ parts: twoParts });
+    const outcome = await ingestEnvelopeBytes(db, enc(envelope), 'backup_import');
+    expect(outcome).toEqual({ kind: 'committed', run_id: envelope.run_id });
+    expect((await getRun(db, envelope.run_id))?.envelope).toEqual(envelope);
+  });
+
+  it('an identical existing v2 run_id + envelope_sha256 is a no-op ("already present")', async () => {
+    const envelope = await buildTestMultipartEnvelope({ parts: twoParts });
+    await ingestEnvelopeBytes(db, enc(envelope), 'backup_import');
+    const outcome = await ingestEnvelopeBytes(db, enc(envelope), 'backup_import');
+    expect(outcome).toEqual({ kind: 'already_present', run_id: envelope.run_id });
+  });
+
+  it('a divergent v2 envelope under the same run_id is preserved as a v2 variant, canonical becomes conflict', async () => {
+    const canonical = await buildTestMultipartEnvelope({ parts: twoParts });
+    await ingestEnvelopeBytes(db, enc(canonical), 'backup_import');
+
+    const { jcsSha256Hex } = await import('../../src/core/envelope/canonicalHash');
+    const rest = withoutKey({ ...canonical, query_text: 'a different query' }, 'envelope_sha256');
+    const divergent = { ...rest, envelope_sha256: await jcsSha256Hex(rest) };
+
+    const outcome = await ingestEnvelopeBytes(db, enc(divergent), 'backup_import');
+    expect(outcome).toEqual({ kind: 'conflict', run_id: canonical.run_id });
+
+    const stored = await getRun(db, canonical.run_id);
+    expect(stored?.envelope).toEqual(canonical); // canonical untouched
+    expect(stored?.sync.state).toBe('conflict');
+
+    const variant = await db.get(STORE.runVariants, [canonical.run_id, divergent.envelope_sha256]);
+    expect(variant?.envelope).toEqual(divergent); // stored with its v2 shape intact, not coerced
+    expect(variant?.envelope.schema_version).toBe('2');
   });
 });
 
