@@ -29,6 +29,11 @@
   let backupFile = $state<BackupFile | undefined>(undefined);
   let previewBusy = $state(false);
   let preview = $state<BackupPreview | undefined>(undefined);
+  let previewError = $state<string | undefined>(undefined);
+
+  /** Guards against a stale, still-in-flight file selection overwriting a later one's result —
+   * see `handleFileChange`. */
+  let previewRequestId = 0;
 
   let importBusy = $state(false);
   let importResults = $state<BackupImportEntryResult[] | undefined>(undefined);
@@ -79,36 +84,59 @@
   }
 
   function resetImportState(): void {
+    previewRequestId += 1; // abandon any in-flight preview for a prior selection
     parseError = undefined;
     backupFile = undefined;
     preview = undefined;
+    previewError = undefined;
+    previewBusy = false;
     importResults = undefined;
     if (fileInputEl) fileInputEl.value = '';
   }
 
+  /**
+   * Selecting a file starts an async read-and-preview that can still be running when the user
+   * picks a *different* file before it resolves. Each call captures its own `requestId`; if a
+   * later call has since bumped `previewRequestId`, this call's remaining work is abandoned
+   * rather than allowed to overwrite `backupFile`/`preview` with stale data (Bugbot). The file
+   * input is disabled for the whole duration (`previewBusy`, set before the first await) so a
+   * second selection can only happen via this same guarded path, never mid-render.
+   */
   async function handleFileChange(event: Event): Promise<void> {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
 
+    previewRequestId += 1;
+    const requestId = previewRequestId;
     parseError = undefined;
     backupFile = undefined;
     preview = undefined;
+    previewError = undefined;
     importResults = undefined;
-
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const result = parseBackupFile(bytes);
-    if (!result.ok) {
-      parseError = result;
-      return;
-    }
-
-    backupFile = result.file;
     previewBusy = true;
+
     try {
-      preview = await previewBackupImport(db, result.file);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (requestId !== previewRequestId) return; // superseded by a later selection
+
+      const result = parseBackupFile(bytes);
+      if (requestId !== previewRequestId) return;
+      if (!result.ok) {
+        parseError = result;
+        return;
+      }
+
+      backupFile = result.file;
+      const computed = await previewBackupImport(db, result.file);
+      if (requestId !== previewRequestId) return;
+      preview = computed;
+    } catch {
+      if (requestId === previewRequestId) {
+        previewError = 'Something went wrong while checking this backup. Please try again.';
+      }
     } finally {
-      previewBusy = false;
+      if (requestId === previewRequestId) previewBusy = false;
     }
   }
 
@@ -166,12 +194,19 @@
         type="file"
         accept=".json,application/json"
         onchange={(e) => void handleFileChange(e)}
+        disabled={previewBusy || importBusy}
       />
     </div>
 
     {#if parseError}
       <p role="alert" class="n200-badge n200-badge--error">
         {PARSE_ERROR_MESSAGES[parseError.reason]}
+      </p>
+    {/if}
+
+    {#if previewError}
+      <p role="alert" class="n200-badge n200-badge--error">
+        {previewError}
       </p>
     {/if}
 

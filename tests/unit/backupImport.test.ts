@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { commitBackupImport } from '../../src/core/backup/commit';
 import { previewBackupImport } from '../../src/core/backup/classify';
 import { buildBackupFile, type BackupFile } from '../../src/core/backup/manifest';
+import * as runsStore from '../../src/core/storage/runs';
 import { commitNewRun, getAllRuns, getRun } from '../../src/core/storage/runs';
 import { openDatabase, STORE, type N200Database } from '../../src/core/storage/schema';
 import { initialSyncRecord } from '../../src/core/storage/types';
@@ -160,6 +161,83 @@ describe('previewBackupImport + commitBackupImport: the six preview categories',
     expect(results[0]?.outcome.kind).toBe('quarantined');
     expect(await getAllRuns(db)).toEqual([]);
     expect((await db.getAll(STORE.quarantineItems)).length).toBe(1);
+  });
+});
+
+describe('previewBackupImport: loads the canonical run set once per preview (Bugbot fix)', () => {
+  it('scans the runs store at most once, regardless of how many duplicate-hash entries are checked', async () => {
+    const a = await buildTestEnvelope({ runId: '11111111-1111-4111-8111-111111111111' });
+    await commitNewRun(db, a);
+    // Three different new envelopes, all built from the same default fixture as `a`, so each
+    // one's original_file_sha256 matches `a`'s and each should classify as "duplicate" — three
+    // separate source-hash lookups, previously each triggering its own full runs-store scan.
+    const b = await buildTestEnvelope({ runId: '22222222-2222-4222-8222-222222222222' });
+    const c = await buildTestEnvelope({ runId: '33333333-3333-4333-8333-333333333333' });
+    const d = await buildTestEnvelope({ runId: '44444444-4444-4444-8444-444444444444' });
+    expect(b.original_file_sha256).toBe(a.original_file_sha256);
+    expect(c.original_file_sha256).toBe(a.original_file_sha256);
+    expect(d.original_file_sha256).toBe(a.original_file_sha256);
+
+    const file = buildBackupFile([
+      { run_id: b.run_id, envelope: b, sync: initialSyncRecord('pending') },
+      { run_id: c.run_id, envelope: c, sync: initialSyncRecord('pending') },
+      { run_id: d.run_id, envelope: d, sync: initialSyncRecord('pending') },
+    ]);
+
+    // The per-entry, per-hash full-store scan this fix replaces: previously called once for
+    // every source hash on every "would-be-new" entry, instead of loading the canonical run
+    // set into an in-memory lookup a single time up front.
+    const findRunsBySourceFileHashSpy = vi.spyOn(runsStore, 'findRunsBySourceFileHash');
+    const preview = await previewBackupImport(db, file);
+    expect(preview.counts.duplicate).toBe(3);
+
+    expect(findRunsBySourceFileHashSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('previewBackupImport: within-file duplicate run_id sequencing matches sequential commit (Bugbot fix)', () => {
+  it('a second entry with the same run_id and an identical envelope previews as already_present, not added', async () => {
+    const first = await buildTestEnvelope({ runId: '11111111-1111-4111-8111-111111111111' });
+    const file = buildBackupFile([
+      { run_id: first.run_id, envelope: first, sync: initialSyncRecord('pending') },
+      { run_id: first.run_id, envelope: first, sync: initialSyncRecord('pending') },
+    ]);
+    // Neither entry is pre-committed to the DB — both only exist within this one backup file.
+
+    const preview = await previewBackupImport(db, file);
+    expect(preview.entries[0]?.category).toBe('added');
+    expect(preview.entries[1]?.category).toBe('already_present');
+
+    const results = await commitBackupImport(db, file);
+    expect(results[0]?.outcome).toEqual({ kind: 'committed', run_id: first.run_id });
+    expect(results[1]?.outcome).toEqual({ kind: 'already_present', run_id: first.run_id });
+  });
+
+  it('a second entry with the same run_id but a divergent envelope previews as conflict, not added', async () => {
+    const first = await buildTestEnvelope({ runId: '11111111-1111-4111-8111-111111111111' });
+    const { jcsSha256Hex } = await import('../../src/core/envelope/canonicalHash');
+    const rest = withoutKey({ ...first, query_text: 'a different query' }, 'envelope_sha256');
+    const divergent = { ...rest, envelope_sha256: await jcsSha256Hex(rest) };
+
+    const file = buildBackupFile([
+      { run_id: first.run_id, envelope: first, sync: initialSyncRecord('pending') },
+      { run_id: divergent.run_id, envelope: divergent, sync: initialSyncRecord('pending') },
+    ]);
+
+    const preview = await previewBackupImport(db, file);
+    expect(preview.entries[0]?.category).toBe('added');
+    expect(preview.entries[1]?.category).toBe('conflict');
+
+    const results = await commitBackupImport(db, file);
+    expect(results[0]?.outcome).toEqual({ kind: 'committed', run_id: first.run_id });
+    expect(results[1]?.outcome).toEqual({ kind: 'conflict', run_id: first.run_id });
+
+    const stored = await getRun(db, first.run_id);
+    expect(stored?.envelope).toEqual(first); // canonical preserved, never overwritten
+    expect(stored?.sync.state).toBe('conflict');
+
+    const variant = await db.get(STORE.runVariants, [first.run_id, divergent.envelope_sha256]);
+    expect(variant?.envelope).toEqual(divergent);
   });
 });
 
