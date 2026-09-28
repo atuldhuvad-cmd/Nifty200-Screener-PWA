@@ -276,7 +276,7 @@ describe('Bugbot P2-5: structured, non-authoritative discovery metadata on quara
     const outcome = await ingestEnvelopeBytes(db, new TextEncoder().encode('not json'), 'drive', {
       drive_file_id: 'file-abc123',
       drive_app_properties: { app: 'n200-screener', run_id: 'whatever-the-file-claimed' },
-      detection_context: 'periodic Drive folder scan',
+      detection_context: 'drive_folder_scan',
     });
     expect(outcome.kind).toBe('quarantined');
     if (outcome.kind !== 'quarantined') return;
@@ -285,7 +285,7 @@ describe('Bugbot P2-5: structured, non-authoritative discovery metadata on quara
     expect(item?.discovery_metadata).toEqual({
       drive_file_id: 'file-abc123',
       drive_app_properties: { app: 'n200-screener', run_id: 'whatever-the-file-claimed' },
-      detection_context: 'periodic Drive folder scan',
+      detection_context: 'drive_folder_scan',
     });
   });
 
@@ -326,5 +326,41 @@ describe('Bugbot P2-5: structured, non-authoritative discovery metadata on quara
     });
     expect(outcome).toMatchObject({ kind: 'quarantined', reasons: ['JSON_PARSE_FAILED'] });
     expect(await db.get(STORE.runs, 'some-other-run-id-entirely')).toBeUndefined();
+  });
+});
+
+describe('Security review P2-B: discovery metadata is sanitized at the storage boundary', () => {
+  it('a hostile/oversized discovery metadata object is sanitized before being persisted: unknown keys dropped, free-text detection_context dropped, credential-shaped value redacted', async () => {
+    const secret = 'Bearer sk-live-abcdef1234567890SECRETSECRETSECRET';
+    const outcome = await ingestEnvelopeBytes(db, new TextEncoder().encode('not json'), 'drive', {
+      drive_file_id: 'file-abc123',
+      backup_entry_name: secret,
+      detection_context: 'this is free text, not a stable code',
+      admin_override: true,
+      __proto__: { polluted: true },
+    });
+    expect(outcome.kind).toBe('quarantined');
+    if (outcome.kind !== 'quarantined') return;
+
+    const item = await db.get(STORE.quarantineItems, outcome.quarantine_id);
+    expect(item?.discovery_metadata).toEqual({
+      drive_file_id: 'file-abc123',
+      backup_entry_name: '[REDACTED]',
+    });
+    expect(JSON.stringify(item)).not.toContain('SECRETSECRETSECRET');
+    expect(JSON.stringify(item)).not.toContain('admin_override');
+  });
+
+  it('metadata typed as unknown (not pre-validated by the caller) is still safely handled: a non-object is simply omitted, never crashes', async () => {
+    const outcome = await ingestEnvelopeBytes(
+      db,
+      new TextEncoder().encode('not json'),
+      'local_import',
+      'a plain string, not an object' as unknown,
+    );
+    expect(outcome.kind).toBe('quarantined');
+    if (outcome.kind !== 'quarantined') return;
+    const item = await db.get(STORE.quarantineItems, outcome.quarantine_id);
+    expect('discovery_metadata' in (item ?? {})).toBe(false);
   });
 });

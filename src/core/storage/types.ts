@@ -95,6 +95,28 @@ export type QuarantineSource = 'drive' | 'backup_import' | 'local_import';
  * Nothing here is ever used to route, validate, or re-classify the item; it is preserved
  * purely so a human reviewing `quarantine_items` can tell where a bad item came from.
  */
+/**
+ * Stable codes, not free text (security review P2-B) — a free-text field would be an unbounded
+ * channel for whatever a hostile or buggy caller wants to store verbatim.
+ */
+export const QUARANTINE_DETECTION_CONTEXTS = [
+  'drive_folder_scan',
+  'drive_global_search',
+  'backup_import_scan',
+  'manual_recovery_attempt',
+  'periodic_integrity_check',
+  'other',
+] as const;
+export type QuarantineDetectionContext = (typeof QUARANTINE_DETECTION_CONTEXTS)[number];
+
+/**
+ * Structured, non-authoritative discovery metadata, bounded at the storage boundary by
+ * `sanitizeQuarantineDiscoveryMetadata` (security review P2-B) before ever reaching
+ * `QuarantineItemRecord`: unknown keys are dropped, known string fields are length-limited,
+ * and any value that looks credential-shaped (a bearer/basic auth string, a JWT, a URL with a
+ * query string or embedded userinfo, or — outside `drive_file_id`, whose normal shape is a
+ * long opaque token — a long opaque token) is replaced with `'[REDACTED]'` rather than stored.
+ */
 export interface QuarantineDiscoveryMetadata {
   /** Drive file id, when `source === 'drive'`. Never trusted; see brief on appProperties. */
   drive_file_id?: string;
@@ -104,8 +126,8 @@ export interface QuarantineDiscoveryMetadata {
   backup_entry_name?: string;
   /** The entry's position within the backup manifest's ordered run-ID list. */
   backup_entry_index?: number;
-  /** Free-text note on how/where this item was found (e.g. which scan or restore attempt). */
-  detection_context?: string;
+  /** A stable code for how/where this item was found — never free text. */
+  detection_context?: QuarantineDetectionContext;
 }
 
 export interface QuarantineItemRecord {

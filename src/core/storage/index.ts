@@ -8,6 +8,7 @@ export {
 export type { IdentityConflictEntry, IdentityConflictGroup } from './comparisonIndex';
 export type { IngestOutcome } from './ingest';
 export { ingestEnvelopeBytes } from './ingest';
+export { REDACTED, sanitizeQuarantineDiscoveryMetadata } from './sanitizeDiscoveryMetadata';
 export {
   isWebLocksAvailable,
   WEB_LOCKS_UNAVAILABLE_CODE,
@@ -38,9 +39,10 @@ export {
 export type { N200Database, N200DBSchema, OpenDatabaseOptions, OpenDatabaseResult } from './schema';
 export { SYNC_STATES, transition } from './syncState';
 export type { SyncEvent, SyncEventType, TransitionResult } from './syncState';
-export { initialSyncRecord } from './types';
+export { initialSyncRecord, QUARANTINE_DETECTION_CONTEXTS } from './types';
 export type {
   ComparisonIdentityRecord,
+  QuarantineDetectionContext,
   QuarantineDiscoveryMetadata,
   QuarantineItemRecord,
   QuarantineSource,

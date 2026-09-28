@@ -206,3 +206,57 @@ describe('rebuildComparisonIndexForRun', () => {
     await expect(rebuildComparisonIndexForRun(db, 'does-not-exist')).resolves.toBeUndefined();
   });
 });
+
+describe('Security review P2-A scope check: commitNewRun/applyTransition need no Web Lock', () => {
+  // The brief reserves Web Locks for operations that span *multiple* IndexedDB transactions
+  // and must pick a single acting tab (draining the pending sync queue, Drive-folder creation,
+  // backup restoration, schema migration — see brief "Cross-tab concurrency"). commitNewRun and
+  // applyTransition are each a single atomic IndexedDB transaction, which the platform itself
+  // already serializes safely across tabs with no extra locking — so, unlike the migration path
+  // (security review P2-A), they correctly do NOT gate on Web Locks. These tests prove that
+  // claim rather than just asserting it: both operations behave safely with Web Locks stubbed
+  // unavailable throughout.
+  async function withStubbedNavigator<T>(value: unknown, fn: () => Promise<T>): Promise<T> {
+    const original: unknown = (globalThis as { navigator?: unknown }).navigator;
+    Object.defineProperty(globalThis, 'navigator', { value, configurable: true });
+    try {
+      return await fn();
+    } finally {
+      Object.defineProperty(globalThis, 'navigator', { value: original, configurable: true });
+    }
+  }
+
+  it('commitNewRun succeeds normally with Web Locks unavailable (it never depended on them)', async () => {
+    const envelope = await buildTestEnvelope();
+    const result = await withStubbedNavigator({}, () => commitNewRun(db, envelope));
+    expect(result).toEqual({ ok: true, run_id: envelope.run_id });
+  });
+
+  it('two concurrent applyTransition calls on the same run, with Web Locks unavailable, never lose an update: exactly one succeeds and the other is correctly rejected as invalid, or both succeed only if genuinely sequential and compatible', async () => {
+    const envelope = await buildTestEnvelope();
+    await commitNewRun(db, envelope);
+
+    // Both start from `pending`; only one of two concurrent START_SYNC calls can legally win
+    // (a run can't be `syncing` twice), and IndexedDB's own per-store transaction ordering —
+    // not a Web Lock — is what prevents them from corrupting each other.
+    const [a, b] = await withStubbedNavigator({}, () =>
+      Promise.all([
+        applyTransition(db, envelope.run_id, { type: 'START_SYNC' }),
+        applyTransition(db, envelope.run_id, { type: 'START_SYNC' }),
+      ]),
+    );
+
+    const outcomes = [a, b];
+    const succeeded = outcomes.filter((o) => o.ok);
+    const rejected = outcomes.filter((o) => !o.ok);
+    // Exactly one call observes `pending` and transitions to `syncing`; the other observes the
+    // now-`syncing` state and correctly reports invalid_transition — never both silently
+    // "succeeding" into a corrupted double-attempt-count state.
+    expect(succeeded).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+
+    const record = await getRun(db, envelope.run_id);
+    expect(record?.sync.state).toBe('syncing');
+    expect(record?.sync.diagnostics.attempt_count).toBe(1); // not 2 — no lost/duplicated update
+  });
+});

@@ -2,12 +2,12 @@ import { sha256Hex } from '../envelope/hash';
 import type { RunEnvelopeV1 } from '../envelope/types';
 import { validateEnvelope } from '../envelope/validate';
 import { rebuildComparisonIndexTx } from './comparisonIndex';
+import { sanitizeQuarantineDiscoveryMetadata } from './sanitizeDiscoveryMetadata';
 import { STORE, type N200Database } from './schema';
 import { transition } from './syncState';
 import { safeAbort } from './txUtils';
 import {
   initialSyncRecord,
-  type QuarantineDiscoveryMetadata,
   type QuarantineSource,
   type RunRecord,
   type UnsupportedSchemaEnvelope,
@@ -30,9 +30,12 @@ async function quarantine(
   bytes: Uint8Array,
   source: QuarantineSource,
   reasons: string[],
-  discoveryMetadata: QuarantineDiscoveryMetadata | undefined,
+  discoveryMetadata: unknown,
 ): Promise<IngestOutcome> {
   const quarantine_id = generateId();
+  // Sanitized at this storage boundary (security review P2-B) — never trust the caller to
+  // have already validated/bounded it; see sanitizeDiscoveryMetadata.ts.
+  const sanitized = sanitizeQuarantineDiscoveryMetadata(discoveryMetadata);
   await db.add(STORE.quarantineItems, {
     quarantine_id,
     original_bytes: bytes,
@@ -40,7 +43,7 @@ async function quarantine(
     observed_sha256: await sha256Hex(bytes),
     validation_errors: reasons,
     discovered_at: new Date().toISOString(),
-    ...(discoveryMetadata !== undefined ? { discovery_metadata: discoveryMetadata } : {}),
+    ...(sanitized !== undefined ? { discovery_metadata: sanitized } : {}),
   });
   return { kind: 'quarantined', quarantine_id, reasons };
 }
@@ -94,7 +97,9 @@ export async function ingestEnvelopeBytes(
   db: N200Database,
   bytes: Uint8Array,
   source: QuarantineSource,
-  discoveryMetadata?: QuarantineDiscoveryMetadata,
+  /** Untyped on purpose (security review P2-B): sanitized/bounded internally before storage,
+   * never trusted as already-valid just because a caller typed it as `QuarantineDiscoveryMetadata`. */
+  discoveryMetadata?: unknown,
 ): Promise<IngestOutcome> {
   const parsed = tryParseJson(bytes);
   if (!parsed.ok) return quarantine(db, bytes, source, ['JSON_PARSE_FAILED'], discoveryMetadata);

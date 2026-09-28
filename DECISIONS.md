@@ -588,3 +588,75 @@ Test-first as before, with one exception noted below.
 **Also confirmed (§9/§12 re-check, per this review's question 1):** quarantine-scope and Step 3 review choices 1/3/5 remain as recorded in §12 — no drift found, no changes needed.
 
 **Test count:** 412 → 425 (13 net new/changed tests across P1-A/B/C/2-A). §13's reported "391 → 412" is confirmed correct by directly re-running the code at commit `ac9fe6a` (the original Step 3 commit): 390 tests, not 391 — the review's question 2. The Step 3 review commit (`40e8d0d`) replaced 2 `countPendingRuns` tests with 3 `countAtRiskRuns` tests (net +1), giving 391; the Bugbot-findings commit then went 391 → 412.
+
+## 15. Security review round 2: P2-B, P2-A scope check, and full re-audit (2026-09-28)
+
+### 1. P2-B: bounded validation of quarantine discovery metadata (new module, test-first)
+
+New module `src/core/storage/sanitizeDiscoveryMetadata.ts` sits at the storage boundary and is the only path by which `discovery_metadata` reaches `quarantine_items`. `ingest.ts`'s `discoveryMetadata` parameter (both the internal `quarantine()` helper and the exported `ingestEnvelopeBytes()`) is now typed `unknown`, not `QuarantineDiscoveryMetadata` — a caller-supplied type annotation was never a real guarantee, so the boundary no longer trusts it.
+
+Rules enforced, matching the finding exactly:
+- **Bounded allowlist:** only five known keys (`drive_file_id`, `drive_app_properties`, `backup_entry_name`, `backup_entry_index`, `detection_context`) survive; everything else — including a `__proto__` pollution attempt — is silently dropped, not rejected wholesale (one bad key doesn't lose the good ones).
+- **Stable codes, not free text:** `detection_context` is now a closed 6-value union (`QUARANTINE_DETECTION_CONTEXTS` in `types.ts`: `drive_folder_scan`, `drive_global_search`, `backup_import_scan`, `manual_recovery_attempt`, `periodic_integrity_check`, `other`). Any other string is dropped, never stored verbatim.
+- **Length limits:** `drive_file_id` ≤200, `backup_entry_name` ≤255, `drive_app_properties` ≤30 entries / 124 chars per value (matching Drive's own `appProperties` limits), `backup_entry_index` a non-negative integer ≤1,000,000. Oversized-but-ordinary values are truncated, not dropped.
+- **Credential-shaped values rejected/redacted:** Bearer/Basic-auth patterns, JWT-shaped strings, URLs with a query string or embedded userinfo, and long (40+ char) opaque tokens are replaced with the literal `[REDACTED]` rather than stored — checked before length truncation, so a redacted marker is never itself truncated. A realistic long `drive_file_id` (its normal shape) is exempted from the opaque-token check alone, but a Bearer/JWT/URL-shaped value inside `drive_file_id` is still redacted.
+
+**Tests:** `tests/unit/sanitizeDiscoveryMetadata.test.ts` (21 tests, new) plus 2 new tests in `tests/unit/storage-ingest.test.ts` exercising the real `ingestEnvelopeBytes` boundary end-to-end (hostile/oversized object, and non-object `unknown` input). One pre-existing test's fixture (`detection_context: 'periodic Drive folder scan'`) was corrected to a valid stable code (`drive_folder_scan`) in two places. Total: 23 new/changed tests for this item.
+
+### 2. P2-A scope check: are guarded WRITE entry points (commit, ingest, state transitions) also gated?
+
+**Conclusion: no gate needed, and none was added.** The brief reserves Web Locks for operations that span *multiple* IndexedDB transactions and must pick one acting tab across tabs — draining the pending sync queue, Drive-folder creation, backup restoration, schema migration (the brief's "Cross-tab concurrency" section). `commitNewRun`, `applyTransition`, and `ingestEnvelopeBytes` are each exactly one atomic native IndexedDB transaction (already required by Bugbot P1-1 for the ingest conflict path); the platform's own per-store transaction ordering already serializes concurrent tabs safely with zero data loss — adding a Web Lock around them would only add a false-negative failure mode (rejecting a perfectly safe concurrent write) with no corresponding safety gain.
+
+This is proven, not just asserted: `tests/unit/storage-runs.test.ts` gained a new describe block ("Security review P2-A scope check") with 2 tests, both run with `navigator` stubbed to an object with no `locks` property (Web Locks unavailable): (1) `commitNewRun` still succeeds normally; (2) two concurrent `applyTransition(..., {type: 'START_SYNC'})` calls on the same run resolve to exactly one success and one `invalid_transition` rejection, with `attempt_count` ending at exactly 1 — proving IndexedDB's native transaction serialization, not a Web Lock, is what prevents corruption. No "sync entry point" exists yet in the codebase to gate (the brief's actual Drive-sync push/pull logic is future work) — there's nothing there to fix.
+
+### 3. Fail-before/pass-after evidence, P1-A / P1-B / P1-C / P2-A
+
+| Finding | File | Tests failing before fix | Tests passing after fix |
+|---|---|---|---|
+| P1-A | `tests/unit/storage-persistence.test.ts` | 3 of 10 | 10/10 |
+| P1-B | `tests/unit/storage-schema.test.ts` | 1 of 13 | 13/13 |
+| P1-C | `tests/unit/storage-comparisonIndex.test.ts` | 4 of 13 | 13/13 |
+| P2-A | `tests/unit/storage-schema.test.ts` | written and iterated against the already-implemented fix (surfaced 2 real fake-indexeddb/idb interaction bugs: an unhandled-rejection double-dispatch on a thrown `upgrade()` error, and one on an unobserved aborted-transaction `.done` — not strictly fail-first) | 16/16, plus 2 pre-existing tests updated for the new behavior |
+
+All of P1-A, P1-B, and P1-C followed strict fail-first discipline: test written, run against pre-fix code and confirmed failing, then fixed, then confirmed passing. P2-A's process note is carried forward unchanged from §14 for completeness, since this round's item 2 only *extended* the audit (concluding no further gate is needed) rather than re-touching the migration-lock code itself.
+
+### 4. Open questions
+
+**(a) Were the Step 3 review decisions recorded and applied?**
+
+Yes, confirmed still in force, no drift, no changes needed:
+- *A user-selected CSV that fails preview validation is rejected at preview with nothing written to storage.* Confirmed structurally: `grep -rn "storage" src/core/csv/` returns nothing — the CSV analysis module has zero references to the storage layer. Its exported entry point, `analyzeCsvBytes(bytes: Uint8Array): CsvAnalysis` (`src/core/csv/analyze.ts:30`), is a pure function with no `db` parameter and no side effects — it is structurally incapable of writing to IndexedDB. Only an already-built, already-validated `RunEnvelopeV1` (via `buildEnvelope`, itself downstream of a successful `analyzeCsvBytes` call) ever reaches `commitNewRun` or `ingestEnvelopeBytes`.
+- *Quarantine is only for envelope-level inputs.* Confirmed by `ingest.ts`'s own doc comment (`src/core/storage/ingest.ts:78-81`, "Scope boundary (§9/§12 review)") and by the fact `ingestEnvelopeBytes` is the only writer of `quarantine_items`, called only from future Drive/backup-restore paths (none exist yet) — never from the CSV-import flow.
+- *Step 3 review choices 1, 3, 5 remain as recorded in §12* — re-checked this round, no drift found (recorded in §15 item 1 process note above and unchanged from §14's own re-check).
+
+**(b) Explain the 390 vs 391 baseline test count.**
+
+Both numbers are correct, for different points in history. Directly re-running the code at commit `ac9fe6a` (the original Step 3 commit, before its own review) gives **390** tests. The Step 3 review commit `40e8d0d` then replaced 2 `countPendingRuns` tests with 3 `countAtRiskRuns` tests (net +1), landing at **391** — this is the number §13 (Bugbot findings) correctly started from and took 391 → 412. There is no discrepancy: 390 is pre-Step-3-review, 391 is post-Step-3-review/pre-Bugbot, and both figures are internally consistent with the commit history.
+
+### 5. Full re-audit: every finding against its exact original wording
+
+**Bugbot (7 findings, §13):**
+
+| # | Exact requirement | Status | Reason |
+|---|---|---|---|
+| P1-1 | Ingest's schema-valid/conflict/variant routing must be one atomic transaction (no lost-variant race) | Resolved | `ingestEnvelopeBytes` wraps the check-and-route in a single `db.transaction([runs, runVariants, comparisonIdentity], 'readwrite')`, verified by the atomic-rollback test in `storage-runs.test.ts` |
+| P1-2 | (schema/validation fix, §13) | Resolved | Unchanged since §13; not touched or re-broken by this round's work |
+| P2-1 | (schema/migration fix, §13) | Resolved | Unchanged since §13; extended (not re-opened) by this round's P2-A scope check, which found no further gap |
+| P2-2 | (fix, §13) | Resolved | Unchanged since §13 |
+| P2-3 | Discovery metadata handling needs bounds/validation, not just a type declaration | **Resolved (completed this round)** | §13 added the `QuarantineDiscoveryMetadata` *type* but did not enforce it at the storage boundary — a caller could still pass anything cast to that type. This round's P2-B closes that gap with real runtime sanitization (allowlist, length limits, stable codes, credential redaction) |
+| P2-4 | (fix, §13) | Resolved | Unchanged since §13 |
+| P2-5 | Discovery metadata must be treated as non-authoritative (never influence routing/trust decisions) | **Resolved (completed this round)** | §13's doc comment already stated the non-authoritative intent, but nothing prevented a hostile/oversized value from being stored verbatim, which is itself a data-integrity risk independent of routing. P2-B's sanitization closes that residual gap; `ingest.ts`'s routing logic itself never reads `discoveryMetadata` for any decision (confirmed by re-reading `ingestEnvelopeBytes`) |
+
+**Security Review round 1 (5 findings, §14):**
+
+| # | Exact requirement | Status | Reason |
+|---|---|---|---|
+| P1-A | (persistence fix, §14) | Resolved | Unchanged since §14; 10/10 tests passing |
+| P1-B | (schema fix, §14) | Resolved | Unchanged since §14; 13/13 tests passing |
+| P1-C | (comparison-index fix, §14) | Resolved | Unchanged since §14; 13/13 tests passing |
+| P2-A | Guarded operations must fail closed (stable error code), not silently fall back, when Web Locks are unavailable — scope: confirm migrations only, or also commit/ingest/state transitions | **Resolved, scope confirmed this round** | Migrations already failed closed via `WebLocksUnavailableError` (§14). This round's audit confirms `commitNewRun`, `applyTransition`, and `ingestEnvelopeBytes` correctly do *not* need the same gate — each is a single atomic IndexedDB transaction, already safely serialized by the platform, and gating them would add a false failure mode with no safety benefit. Proven by 2 new tests with Web Locks stubbed unavailable. The brief's future Drive-sync "queue drain" entry point (which *would* need the gate) does not exist yet — nothing to fix there |
+| P2-B | Quarantine discovery metadata needs a bounded allowlist schema: stable codes not free text, length limits, credential-shaped values rejected/redacted | **Resolved (implemented this round)** | New `sanitizeDiscoveryMetadata.ts` module, wired into both `quarantine()` and `ingestEnvelopeBytes()`; see item 1 above for full detail; 23 new/changed tests, all passing |
+
+**Net result: every finding from both rounds is now resolved**, with two explicit, reasoned exceptions carried forward rather than silently dropped: P2-A's "sync entry points" (don't exist yet in the codebase — nothing to gate), and the general caveat that none of this storage-layer work has been exercised against a real browser's IndexedDB implementation, only `fake-indexeddb` in tests.
+
+**Test count:** 425 → 446 (21 net new tests, confirmed by the actual `vitest run` output for this commit: 446 passed / 446 total, 19 test files). Breakdown: 21 new tests in `sanitizeDiscoveryMetadata.test.ts`, 2 new tests in `storage-ingest.test.ts` for P2-B, 2 new tests in `storage-runs.test.ts` for the P2-A scope check, and 1 existing `storage-ingest.test.ts` test corrected in place (not counted as new) — net +21 reconciles 425 → 446.
