@@ -607,6 +607,8 @@ Rules enforced, matching the finding exactly:
 
 **Conclusion: no gate needed, and none was added.** The brief reserves Web Locks for operations that span *multiple* IndexedDB transactions and must pick one acting tab across tabs — draining the pending sync queue, Drive-folder creation, backup restoration, schema migration (the brief's "Cross-tab concurrency" section). `commitNewRun`, `applyTransition`, and `ingestEnvelopeBytes` are each exactly one atomic native IndexedDB transaction (already required by Bugbot P1-1 for the ingest conflict path); the platform's own per-store transaction ordering already serializes concurrent tabs safely with zero data loss — adding a Web Lock around them would only add a false-negative failure mode (rejecting a perfectly safe concurrent write) with no corresponding safety gain.
 
+**Decision:** this single-transaction rationale is accepted as a deliberate deviation from Security Review P2-A's literal request to reject all guarded writes when Web Locks are unavailable. Multi-step migrations still fail closed; future multi-step sync entry points must do the same.
+
 This is proven, not just asserted: `tests/unit/storage-runs.test.ts` gained a new describe block ("Security review P2-A scope check") with 2 tests, both run with `navigator` stubbed to an object with no `locks` property (Web Locks unavailable): (1) `commitNewRun` still succeeds normally; (2) two concurrent `applyTransition(..., {type: 'START_SYNC'})` calls on the same run resolve to exactly one success and one `invalid_transition` rejection, with `attempt_count` ending at exactly 1 — proving IndexedDB's native transaction serialization, not a Web Lock, is what prevents corruption. No "sync entry point" exists yet in the codebase to gate (the brief's actual Drive-sync push/pull logic is future work) — there's nothing there to fix.
 
 ### 3. Fail-before/pass-after evidence, P1-A / P1-B / P1-C / P2-A
@@ -643,9 +645,9 @@ Both numbers are correct, for different points in history. Directly re-running t
 | P1-2 | (schema/validation fix, §13) | Resolved | Unchanged since §13; not touched or re-broken by this round's work |
 | P2-1 | (schema/migration fix, §13) | Resolved | Unchanged since §13; extended (not re-opened) by this round's P2-A scope check, which found no further gap |
 | P2-2 | (fix, §13) | Resolved | Unchanged since §13 |
-| P2-3 | Discovery metadata handling needs bounds/validation, not just a type declaration | **Resolved (completed this round)** | §13 added the `QuarantineDiscoveryMetadata` *type* but did not enforce it at the storage boundary — a caller could still pass anything cast to that type. This round's P2-B closes that gap with real runtime sanitization (allowlist, length limits, stable codes, credential redaction) |
+| P2-3 | At-risk count must cover every canonical run without a verified remote copy | Resolved | §13 added explicit `has_verified_remote_copy`; Security Review P1-A in §14 made it the sole authoritative durability signal used by `countAtRiskRuns` |
 | P2-4 | (fix, §13) | Resolved | Unchanged since §13 |
-| P2-5 | Discovery metadata must be treated as non-authoritative (never influence routing/trust decisions) | **Resolved (completed this round)** | §13's doc comment already stated the non-authoritative intent, but nothing prevented a hostile/oversized value from being stored verbatim, which is itself a data-integrity risk independent of routing. P2-B's sanitization closes that residual gap; `ingest.ts`'s routing logic itself never reads `discoveryMetadata` for any decision (confirmed by re-reading `ingestEnvelopeBytes`) |
+| P2-5 | Discovery metadata must be non-authoritative, bounded, allowlisted, and sanitized at the storage boundary | **Resolved (completed this round)** | §13 established non-authoritative routing; this round's P2-B adds runtime sanitization with known keys, length limits, stable codes, and credential redaction before persistence |
 
 **Security Review round 1 (5 findings, §14):**
 
