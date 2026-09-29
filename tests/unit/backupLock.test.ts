@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { commitBackupImport } from '../../src/core/backup/commit';
 import { buildBackupFile } from '../../src/core/backup/manifest';
-import { WebLocksUnavailableError } from '../../src/core/storage/locks';
+import { ACTIVITY_LOCK_NAME, WebLocksUnavailableError } from '../../src/core/storage/locks';
 import { openDatabase, STORE, type N200Database } from '../../src/core/storage/schema';
 import { initialSyncRecord } from '../../src/core/storage/types';
 import { buildTestEnvelope, freshDbName } from '../storage-helpers';
@@ -59,7 +59,7 @@ describe('commitBackupImport Web Lock', () => {
       },
     });
     const [a, b] = await Promise.all([commitBackupImport(db, f), commitBackupImport(db, f)]);
-    expect(names).toEqual(['n200-backup-restore', 'n200-backup-restore']);
+    expect(names).toEqual([ACTIVITY_LOCK_NAME, ACTIVITY_LOCK_NAME]);
     expect(maxActive).toBe(1);
     expect([a[0]?.outcome.kind, b[0]?.outcome.kind].sort()).toEqual([
       'already_present',

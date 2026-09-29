@@ -7,7 +7,12 @@ import {
 } from 'idb';
 import { rebuildComparisonIndexTx } from './comparisonIndex';
 import type { RunEnvelopeV1 } from '../envelope/types';
-import { isWebLocksAvailable, WebLocksUnavailableError, withMigrationLock } from './locks';
+import {
+  ACTIVITY_LOCK_NAME,
+  isWebLocksAvailable,
+  WebLocksUnavailableError,
+  withMigrationLock,
+} from './locks';
 import type {
   ComparisonIdentityRecord,
   QuarantineItemRecord,
@@ -150,7 +155,45 @@ export async function openDatabase(options: OpenDatabaseOptions = {}): Promise<O
   // spec-sanctioned way to cancel an upgrade from inside the callback.
   const blockedMigration: { oldVersion: number | undefined } = { oldVersion: undefined };
 
-  const openPromise = withMigrationLock('n200-schema-migration', () =>
+  const handlers = {
+    blocked() {
+      options.onBlocked?.();
+    },
+    blocking() {
+      holder.db?.close();
+      options.onReloadNeeded?.();
+    },
+  };
+
+  // Phase 1 — no lock. Try to open at the current version. If the database is already current
+  // this simply succeeds: a plain open must never queue behind the activity lock, or a tab
+  // opened (or reloaded) while another tab runs a long restore would sit on "Opening local
+  // storage" until that restore finished. If a migration is needed, `upgrade` aborts its
+  // transaction at once (rolling back, including a first-time create) and we fall through to
+  // phase 2, which redoes the open under the exclusive lock.
+  const probe: { migrationNeeded: boolean } = { migrationNeeded: false };
+  try {
+    const current = await openDB<N200DBSchema>(options.name ?? DB_NAME, DB_VERSION, {
+      upgrade(_database, _oldVersion, _newVersion, transaction) {
+        probe.migrationNeeded = true;
+        transaction.abort();
+        transaction.done.catch(() => {
+          // Expected: aborting rejects `.done`.
+        });
+      },
+      ...handlers,
+    });
+    holder.db = current;
+    if (!locksAvailable) options.onSingleTabFallback?.();
+    return { db: current, usedLock: locksAvailable, singleTabWarning: !locksAvailable };
+  } catch (e) {
+    if (!probe.migrationNeeded) throw e;
+  }
+
+  // Phase 2 — a migration is needed: run it under the exclusive activity lock (so it excludes
+  // imports, restores and app updates in every tab). If another tab migrated in the meantime,
+  // `upgrade` is not called at all and this is just a normal open.
+  const openPromise = withMigrationLock(ACTIVITY_LOCK_NAME, () =>
     openDB<N200DBSchema>(options.name ?? DB_NAME, DB_VERSION, {
       // Runs under the Web Lock (see `withMigrationLock` above) and completes before this
       // function returns the database to the caller — the migration is never racing a caller
@@ -190,13 +233,7 @@ export async function openDatabase(options: OpenDatabaseOptions = {}): Promise<O
           await migrateV1ToV2(transaction);
         }
       },
-      blocked() {
-        options.onBlocked?.();
-      },
-      blocking() {
-        holder.db?.close();
-        options.onReloadNeeded?.();
-      },
+      ...handlers,
     }),
   );
   let usedLock: boolean;

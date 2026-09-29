@@ -13,6 +13,7 @@
   import ImportForm from './lib/ImportForm.svelte';
   import MultipartImportForm from './lib/MultipartImportForm.svelte';
   import Notices from './lib/Notices.svelte';
+  import UpdateNotice from './lib/UpdateNotice.svelte';
   import RunComparison from './lib/RunComparison.svelte';
   import RunDetail from './lib/RunDetail.svelte';
   import Review from './lib/Review.svelte';
@@ -90,6 +91,8 @@
   <h1>Nifty 200 Screener</h1>
 
   <Notices />
+
+  <UpdateNotice />
 
   {#if reloadNeeded}
     <p role="alert" class="n200-badge n200-badge--warning">

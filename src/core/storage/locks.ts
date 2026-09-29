@@ -11,7 +11,23 @@ export interface LockOutcome<T> {
 
 interface WebLocksLike {
   request<T>(name: string, callback: () => Promise<T> | T): Promise<T>;
+  request<T>(
+    name: string,
+    options: { mode?: 'shared' | 'exclusive' },
+    callback: () => Promise<T> | T,
+  ): Promise<T>;
 }
+
+/**
+ * The single origin-wide lock that guards every operation a service-worker update must never
+ * interrupt (Step 8). One name, so nothing ever needs to hold two locks at once (no nesting):
+ *  - imports hold it SHARED (several may run at once);
+ *  - schema migrations and backup restores hold it EXCLUSIVE;
+ *  - a user-accepted update takes it EXCLUSIVE, and only while holding it asks the waiting
+ *    worker to activate — so the check for running operations and the activation are one atomic
+ *    step, across every open tab, with no check-then-activate race.
+ */
+export const ACTIVITY_LOCK_NAME = 'n200-activity';
 
 function getWebLocks(): WebLocksLike | null {
   const nav: unknown = typeof navigator === 'undefined' ? undefined : navigator;
@@ -32,6 +48,18 @@ export async function withMigrationLock<T>(
   }
   const result = await locks.request(lockName, () => fn());
   return { usedLock: true, result };
+}
+
+/**
+ * Runs an operation (an import commit) while holding the activity lock in shared mode, so an
+ * update accepted in any tab waits for it. If Web Locks are unavailable the operation still runs
+ * (imports remain allowed, DECISIONS §15): updates cannot then be coordinated, so the updater
+ * fails closed instead (`activateWaitingWorker`).
+ */
+export async function withActivity<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = getWebLocks();
+  if (locks === null) return fn();
+  return locks.request(ACTIVITY_LOCK_NAME, { mode: 'shared' }, () => fn());
 }
 
 export function isWebLocksAvailable(): boolean {

@@ -88,6 +88,11 @@ describe('production source never logs to the console', () => {
     expect(listSource(SRC).length).toBeGreaterThan(40);
   });
 
+  it('the service worker template (generated into dist/sw.js) has no reference to console', () => {
+    const template = readFileSync(join(ROOT, 'scripts', 'sw.template.js'), 'utf8');
+    expect(findConsoleUses(template, 'js')).toEqual([]);
+  });
+
   it('src/ contains no reference to console (privacy: logs must carry no CSV values or filenames)', () => {
     const offenders = listSource(SRC)
       .filter((file) => findConsoleUses(readFileSync(file, 'utf8'), kindOf(file)).length > 0)

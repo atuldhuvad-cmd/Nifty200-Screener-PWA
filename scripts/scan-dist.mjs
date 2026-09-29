@@ -7,6 +7,8 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import ts from 'typescript';
+import { SHELL_FILE } from './build-sw.mjs';
 
 /** Content rules: [rule id, pattern]. Deliberately specific to keep false positives near zero. */
 /** @type {[string, RegExp][]} */
@@ -49,33 +51,124 @@ function listFiles(dir) {
   return out;
 }
 
+/** Tokens the service worker must still contain: the request guards that keep user data,
+ * credential-bearing and cross-origin traffic out of its reach. */
+const WORKER_GUARDS = ['authorization', "'GET'", 'url.origin', 'url.search'];
+
+/**
+ * @param {string} source
+ * @returns {number} count of `console` identifiers, found by parsing (comments and strings ignored)
+ */
+function countConsoleIdentifiers(source) {
+  const file = ts.createSourceFile('sw.js', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+  let count = 0;
+  /** @param {ts.Node} node */
+  const visit = (node) => {
+    if (ts.isIdentifier(node) && node.text === 'console') count += 1;
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return count;
+}
+
 /**
  * @param {string} dir
+ * @param {string[]} files build files, relative with forward slashes
+ * @param {boolean} required
  * @returns {{ rule: string, file: string }[]}
  */
-export function scanDist(dir) {
+function scanServiceWorker(dir, files, required) {
+  /** @type {{ rule: string, file: string }[]} */
+  const findings = [];
+  const fileSet = new Set(files);
+
+  if (fileSet.has('manifest.webmanifest') || required) {
+    let valid;
+    try {
+      const manifest = JSON.parse(readFileSync(join(dir, 'manifest.webmanifest'), 'utf8'));
+      const icons = Array.isArray(manifest.icons) ? manifest.icons : [];
+      const hasIcon = (/** @type {string} */ sizes) =>
+        icons.some(
+          (/** @type {{ sizes?: unknown, src?: unknown }} */ icon) =>
+            icon.sizes === sizes && typeof icon.src === 'string' && fileSet.has(icon.src),
+        );
+      valid =
+        typeof manifest.name === 'string' &&
+        manifest.name.length > 0 &&
+        typeof manifest.start_url === 'string' &&
+        !/^([a-z][a-z0-9+.-]*:|\/\/)/i.test(manifest.start_url) &&
+        hasIcon('192x192') &&
+        hasIcon('512x512');
+    } catch {
+      valid = false;
+    }
+    if (!valid) findings.push({ rule: 'MANIFEST_INVALID', file: 'manifest.webmanifest' });
+  }
+
+  if (!fileSet.has('sw.js')) {
+    if (required) findings.push({ rule: 'SERVICE_WORKER_MISSING', file: 'sw.js' });
+    return findings;
+  }
+  const source = readFileSync(join(dir, 'sw.js'), 'utf8');
+  if (countConsoleIdentifiers(source) > 0) findings.push({ rule: 'SW_CONSOLE', file: 'sw.js' });
+  if (WORKER_GUARDS.some((token) => !source.includes(token))) {
+    findings.push({ rule: 'SW_UNGUARDED', file: 'sw.js' });
+  }
+  const list = /JSON\.parse\('(\[[^']*\])'\)/.exec(source)?.[1];
+  /** @type {unknown} */
+  let precache;
+  try {
+    precache = list === undefined ? null : JSON.parse(list);
+  } catch {
+    precache = null;
+  }
+  if (!Array.isArray(precache)) {
+    findings.push({ rule: 'SW_PRECACHE_UNSAFE', file: 'sw.js' });
+  } else {
+    for (const entry of precache) {
+      if (typeof entry !== 'string' || !SHELL_FILE.test(entry)) {
+        findings.push({ rule: 'SW_PRECACHE_UNSAFE', file: 'sw.js' });
+      } else if (!fileSet.has(entry)) {
+        findings.push({ rule: 'SW_PRECACHE_MISSING_FILE', file: 'sw.js' });
+      }
+    }
+  }
+  return findings;
+}
+
+/**
+ * @param {string} dir
+ * @param {{ requireServiceWorker?: boolean }} [options]
+ * @returns {{ rule: string, file: string }[]}
+ */
+export function scanDist(dir, options = {}) {
   if (!existsSync(dir) || !statSync(dir).isDirectory()) {
     throw new Error(`scan-dist: build output directory not found (run the build first): ${dir}`);
   }
   /** @type {{ rule: string, file: string }[]} */
   const findings = [];
+  /** @type {string[]} */
+  const files = [];
   for (const path of listFiles(dir)) {
     const file = relative(dir, path).split(sep).join('/');
+    files.push(file);
     for (const [rule, pattern] of FILE_RULES) {
       if (pattern.test(file)) findings.push({ rule, file });
     }
+    if (file.endsWith('.png')) continue; // binary: text rules do not apply
     const text = readFileSync(path, 'latin1');
     for (const [rule, pattern] of CONTENT_RULES) {
       if (pattern.test(text)) findings.push({ rule, file });
     }
   }
+  findings.push(...scanServiceWorker(dir, files, options.requireServiceWorker === true));
   return findings;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const dir = process.argv[2] ?? 'dist';
   try {
-    const findings = scanDist(dir);
+    const findings = scanDist(dir, { requireServiceWorker: true });
     if (findings.length > 0) {
       console.error(`scan-dist: FAIL — ${String(findings.length)} finding(s) in ${dir}/`);
       for (const f of findings) console.error(`  ${f.rule}  ${f.file}`);

@@ -33,6 +33,14 @@ export default defineConfig(
     },
   },
   {
+    // The service worker template runs in a ServiceWorkerGlobalScope, not a window.
+    files: ['scripts/sw.template.js'],
+    languageOptions: {
+      globals: { ...globals.serviceworker, ...globals.browser },
+    },
+    rules: { 'no-console': 'error' },
+  },
+  {
     files: ['src/**/*.ts', 'src/**/*.svelte'],
     rules: {
       'no-restricted-imports': [
