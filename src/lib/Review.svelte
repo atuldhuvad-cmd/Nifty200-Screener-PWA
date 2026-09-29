@@ -176,12 +176,12 @@
     </section>
 
     <section aria-labelledby="review-resolved">
-      <h3 id="review-resolved">Resolved conflicts ({total(data.resolved)})</h3>
+      <h3 id="review-resolved">Preserved variants ({total(data.resolved)})</h3>
       {#if data.resolved.length === 0}
         <p>None.</p>
       {/if}
       {#each data.resolved as item (item.run.run_id)}
-        <article aria-label={`Resolved: run ${item.run.run_id}`}>
+        <article aria-label={`Preserved variants: run ${item.run.run_id}`}>
           <h4>Run {item.run.run_id}</h4>
           <p>Current state: {item.run.sync.state}. The preserved variants below are read-only.</p>
           {@render copiesTable(item)}

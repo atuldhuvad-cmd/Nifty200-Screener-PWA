@@ -202,7 +202,7 @@ test.describe('Step 6B: conflict and quarantine review', () => {
     await expect(page.getByText('No conflicts.')).toBeVisible();
     expect(await runSyncState(page, runId)).toBe('local_only');
 
-    const resolved = page.getByRole('article', { name: `Resolved: run ${runId}` });
+    const resolved = page.getByRole('article', { name: `Preserved variants: run ${runId}` });
     await expect(resolved).toBeVisible();
     await expect(
       resolved.getByRole('button', { name: `Export variant 1 of run ${runId}` }),
