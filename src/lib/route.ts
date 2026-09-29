@@ -64,3 +64,12 @@ export function backupHash(): string {
 export function isBackupRoute(hash: string): boolean {
   return hash === '#/backup';
 }
+
+/** Step 6B: the conflict/quarantine review view. A plain, static route. */
+export function reviewHash(): string {
+  return '#/review';
+}
+
+export function isReviewRoute(hash: string): boolean {
+  return hash === '#/review';
+}

@@ -1,5 +1,12 @@
-import { ingestEnvelopeBytes, type IngestOutcome, type N200Database } from '../storage';
+import {
+  ingestEnvelopeBytes,
+  withRequiredLock,
+  type IngestOutcome,
+  type N200Database,
+} from '../storage';
 import type { BackupFile } from './manifest';
+
+export const BACKUP_RESTORE_LOCK_NAME = 'n200-backup-restore';
 
 /** `IngestOutcome` plus one kind this module alone can produce: a genuinely unexpected failure
  * (e.g. a storage-quota error) distinct from an ordinary data-quality `quarantined` outcome —
@@ -18,12 +25,28 @@ export interface BackupImportEntryResult {
  * re-validated from scratch — nothing is trusted just because it was already parsed once
  * during preview) — each call is already fully atomic and self-contained per entry (Bugbot
  * P1-1), so one corrupt or divergent entry quarantines/conflicts on its own without aborting
- * any other entry in the same backup file. Never throws: a genuinely unexpected failure for one
+ * any other entry in the same backup file.
+ *
+ * The whole restore runs under one exclusive Web Lock (`BACKUP_RESTORE_LOCK_NAME`) so two tabs
+ * never restore at once, and **fails closed** — throws `WebLocksUnavailableError` before writing
+ * anything — when Web Locks are unavailable. The lock serializes tabs only; it does **not** make
+ * the multi-entry restore one atomic transaction. The per-entry `ingestEnvelopeBytes`
+ * transactions remain the sole atomicity guarantee, so a restore interrupted midway leaves every
+ * already-processed entry committed and every later one untouched.
+ *
+ * Apart from that lock failure, never throws: a genuinely unexpected failure for one
  * entry (e.g. a storage-quota error, not a data-quality one) is recorded as its own outcome
  * rather than stopping the batch, so "process entries independently" holds even for failures
  * `ingestEnvelopeBytes` itself doesn't normally produce.
  */
 export async function commitBackupImport(
+  db: N200Database,
+  file: BackupFile,
+): Promise<BackupImportEntryResult[]> {
+  return withRequiredLock(BACKUP_RESTORE_LOCK_NAME, () => restoreEntries(db, file));
+}
+
+async function restoreEntries(
   db: N200Database,
   file: BackupFile,
 ): Promise<BackupImportEntryResult[]> {

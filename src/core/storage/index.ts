@@ -19,6 +19,7 @@ export {
   WEB_LOCKS_UNAVAILABLE_CODE,
   WebLocksUnavailableError,
   withMigrationLock,
+  withRequiredLock,
 } from './locks';
 export type { LockOutcome } from './locks';
 export { countAtRiskRuns, requestPersistentStorage } from './persistence';

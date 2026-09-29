@@ -11,7 +11,7 @@
     type BackupPreview,
     type ParseBackupResult,
   } from '../core/backup';
-  import { getAllRuns, type N200Database } from '../core/storage';
+  import { getAllRuns, WebLocksUnavailableError, type N200Database } from '../core/storage';
 
   interface Props {
     db: N200Database;
@@ -37,6 +37,7 @@
 
   let importBusy = $state(false);
   let importResults = $state<BackupImportEntryResult[] | undefined>(undefined);
+  let importError = $state<string | undefined>(undefined);
 
   const CATEGORY_LABELS: Record<BackupEntryCategory, string> = {
     added: 'Added',
@@ -91,6 +92,7 @@
     previewError = undefined;
     previewBusy = false;
     importResults = undefined;
+    importError = undefined;
     if (fileInputEl) fileInputEl.value = '';
   }
 
@@ -147,9 +149,15 @@
   async function confirm(): Promise<void> {
     if (backupFile === undefined) return;
     importBusy = true;
+    importError = undefined;
     try {
       importResults = await commitBackupImport(db, backupFile);
       onImported();
+    } catch (e) {
+      importError =
+        e instanceof WebLocksUnavailableError
+          ? 'This browser cannot coordinate imports across tabs (Web Locks are unavailable), so the import was not started and nothing was changed. Use a browser that supports Web Locks, with a single tab open.'
+          : 'Something went wrong while importing this backup. Entries already processed stay saved; please check run history and try again.';
     } finally {
       importBusy = false;
     }
@@ -208,6 +216,10 @@
       <p role="alert" class="n200-badge n200-badge--error">
         {previewError}
       </p>
+    {/if}
+
+    {#if importError}
+      <p role="alert" class="n200-badge n200-badge--error">{importError}</p>
     {/if}
 
     {#if previewBusy}
