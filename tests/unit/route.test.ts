@@ -91,3 +91,13 @@ describe('route: hash <-> comparison view (Step 5B)', () => {
     expect(parseCompareRouteFromHash(historyHash())).toBeNull();
   });
 });
+
+describe('Step 6B review route', () => {
+  it('reviewHash / isReviewRoute round-trip and never match other routes', async () => {
+    const { reviewHash, isReviewRoute } = await import('../../src/lib/route');
+    expect(reviewHash()).toBe('#/review');
+    expect(isReviewRoute('#/review')).toBe(true);
+    for (const h of ['', '#/', '#/backup', '#/review/x', '#/compare', '#/run/abc'])
+      expect(isReviewRoute(h)).toBe(false);
+  });
+});

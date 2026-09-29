@@ -14,13 +14,16 @@
   import MultipartImportForm from './lib/MultipartImportForm.svelte';
   import RunComparison from './lib/RunComparison.svelte';
   import RunDetail from './lib/RunDetail.svelte';
+  import Review from './lib/Review.svelte';
   import RunHistory from './lib/RunHistory.svelte';
   import {
     backupHash,
     compareHash,
     isBackupRoute,
+    isReviewRoute,
     parseCompareRouteFromHash,
     parseRunIdFromHash,
+    reviewHash,
   } from './lib/route';
   import StatusBar from './lib/StatusBar.svelte';
 
@@ -42,6 +45,9 @@
   );
   let onBackupRoute = $state(
     typeof location === 'undefined' ? false : isBackupRoute(location.hash),
+  );
+  let onReviewRoute = $state(
+    typeof location === 'undefined' ? false : isReviewRoute(location.hash),
   );
 
   async function refresh(database: N200Database): Promise<void> {
@@ -70,6 +76,7 @@
       selectedRunId = parseRunIdFromHash(location.hash);
       compareRoute = parseCompareRouteFromHash(location.hash);
       onBackupRoute = isBackupRoute(location.hash);
+      onReviewRoute = isReviewRoute(location.hash);
     };
     window.addEventListener('hashchange', onHashChange);
     return () => {
@@ -94,12 +101,20 @@
       <a href="#/">Run history</a>
       <a href={compareHash()}>Compare stocks</a>
       <a href={backupHash()}>Backup</a>
+      <a href={reviewHash()}>Needs review</a>
     </nav>
 
     {#if onBackupRoute}
       <Backup
         {db}
         onImported={() => {
+          if (db) void refresh(db);
+        }}
+      />
+    {:else if onReviewRoute}
+      <Review
+        {db}
+        onChanged={() => {
           if (db) void refresh(db);
         }}
       />

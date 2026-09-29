@@ -54,3 +54,21 @@ export class WebLocksUnavailableError extends Error {
     this.name = 'WebLocksUnavailableError';
   }
 }
+
+/**
+ * Runs `fn` holding an origin-scoped exclusive Web Lock and — unlike `withMigrationLock` —
+ * refuses to run at all when Web Locks are unavailable (fail closed: `WebLocksUnavailableError`
+ * is thrown before `fn` is ever called). For multi-step entry points such as backup restoration
+ * (brief, "Cross-tab concurrency"). The lock only serializes tabs: it does not make `fn` atomic,
+ * and any per-step transactions inside `fn` remain the sole atomicity guarantee. Never call this
+ * from inside another held lock (no nested locks).
+ */
+export async function withRequiredLock<T>(lockName: string, fn: () => Promise<T>): Promise<T> {
+  const locks = getWebLocks();
+  if (locks === null) {
+    throw new WebLocksUnavailableError(
+      `"${lockName}" needs cross-tab coordination but Web Locks are unavailable. Use a single tab in a browser that supports Web Locks.`,
+    );
+  }
+  return locks.request(lockName, () => fn());
+}
