@@ -959,3 +959,13 @@ A PR review of the Step 6 branch (`main...codex/step-6-portable-backup`) raised 
 **Dependency review:** `npm audit` (all severities, including dev): 0 vulnerabilities. Licences (from `package-lock.json` / installed `package.json`): production — MIT 6, Apache-2.0 1, BSD-3-Clause 1, ISC 1; development — MIT 150, Apache-2.0 22, MPL-2.0 14, BSD-2-Clause 8, ISC 7, BSD-3-Clause 2, BlueOak-1.0.0 1. No unlicensed or copyleft-strong entries. This is evidence, not proof.
 
 **Out of scope, untouched:** service worker / offline, Drive, OAuth, sync, hosting, deployment, deletion, and all schemas and grammar listed above.
+
+## 24. Step 7 follow-up: hardening test tightening (2026-09-29)
+
+Test and script changes only; no app behavior, schema, `DB_VERSION`, CSV grammar, metric, backup-format, brief or `samples/` change, and **no new authorization** (§23 stands: only Steps 1–7 are authorized).
+
+- **No-console guard** (`tests/unit/noConsole.test.ts`): fails if any hand-written file under `src/` references the `console` global (calls, bracket access, aliasing, destructuring), ignoring comments. `src/core/envelope/schema/generated/` is skipped. Its detector has its own positive and negative self-tests. Closes the vacuous-pass concern about the browser console test in `tests/e2e/hardening.spec.ts`.
+- **Backup fuzz** (`tests/unit/fuzz.test.ts`): the corrupted-backup property no longer filters with `fc.pre`. All 300 cases are counted; rejected ones must carry one of the seven stable reason codes; accepted ones must preview with zero writes and restore without throwing. The test asserts accepted + rejected = 300, at least half rejected, at least 5 accepted, and fewer than 10% unchanged files.
+- **`scan-dist`:** added a `GITHUB_TOKEN` shape, `.pem` / `.p12` / `.pfx` file types, and tightened `.env` to `.env` or `.env.*` files only (previously any name beginning `.env`, e.g. `.environment`). Rules stay shape-specific; no generic key/secret matching was added.
+
+**Fail-before / pass-after:** 5 new `scanDist` tests failed on the old rules (GitHub token, `.pem`, `.p12`, `.pfx`, and an innocent `.environment-notes.txt` wrongly flagged) and pass now. The two guards that describe existing behavior were mutation-checked and reverted: adding `console.log` to `src/lib/download.ts` failed the no-console test; making `parseBackupFile` always reject failed the fuzz property (0 accepted, needs 5).

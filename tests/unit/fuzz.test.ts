@@ -156,17 +156,37 @@ describe('fuzz: malformed backup files', () => {
     );
   });
 
-  it('a corrupted backup previews with zero writes and restores without throwing', async () => {
+  it('corrupted backups are either rejected with a stable reason or preview/restore safely (both counted)', async () => {
+    const REASONS = new Set([
+      'FILE_TOO_LARGE',
+      'INVALID_ENCODING',
+      'INVALID_JSON',
+      'INVALID_STRUCTURE',
+      'UNSUPPORTED_FORMAT_VERSION',
+      'RUN_COUNT_EXCEEDS_LIMIT',
+      'RUN_COUNT_MISMATCH',
+    ]);
     const envelope = await buildTestEnvelope({ runId: '11111111-1111-4111-8111-111111111111' });
     const good = buildBackupFile([
       { run_id: envelope.run_id, envelope, sync: initialSyncRecord('pending') },
     ]);
     const goodBytes = encode(good);
+    const NUM_RUNS = 300;
+    let rejected = 0;
+    let accepted = 0;
+    let unchanged = 0;
+
     await fc.assert(
       fc.asyncProperty(fc.array(byteEdit, { minLength: 1, maxLength: 6 }), async (edits) => {
-        const parsed = parseBackupFile(applyEdits(goodBytes, edits));
-        fc.pre(parsed.ok);
-        if (!parsed.ok) return;
+        const corrupted = applyEdits(goodBytes, edits);
+        if (Buffer.compare(Buffer.from(corrupted), Buffer.from(goodBytes)) === 0) unchanged += 1;
+        const parsed = parseBackupFile(corrupted);
+        if (!parsed.ok) {
+          rejected += 1;
+          expect(REASONS.has(parsed.reason)).toBe(true);
+          return;
+        }
+        accepted += 1;
         const db = await freshDb();
         const before = await storeCounts(db);
         const preview = await previewBackupImport(db, parsed.file);
@@ -175,7 +195,15 @@ describe('fuzz: malformed backup files', () => {
         const results = await commitBackupImport(db, parsed.file);
         expect(results).toHaveLength(parsed.file.runs.length);
       }),
-      { seed: SEED, numRuns: 60 },
+      { seed: SEED, numRuns: NUM_RUNS },
     );
+
+    // Every generated case is accounted for; nothing is silently filtered away.
+    expect(accepted + rejected).toBe(NUM_RUNS);
+    // Guard against a vacuous property: both branches must really be exercised.
+    expect(rejected).toBeGreaterThanOrEqual(NUM_RUNS / 2);
+    expect(accepted).toBeGreaterThanOrEqual(5);
+    // Edits that leave the file byte-identical are still valid (accepted) cases, but must be rare.
+    expect(unchanged).toBeLessThan(NUM_RUNS / 10);
   });
 });
