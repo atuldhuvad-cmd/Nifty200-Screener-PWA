@@ -1,7 +1,7 @@
 # Nifty 200 Screener PWA: Decisions Record
 
 - **Date:** 2026-09-27
-- **Status:** pre-implementation decisions confirmed by the project owner. **Implementation is authorized only for the completed Steps 1–6 and Step 6B (see §5 and §22).** Drive, OAuth, sync execution, the service worker, hosting, deployment and any later step still require separate, explicit authorization.
+- **Status:** pre-implementation decisions confirmed by the project owner. **Implementation is authorized only for the completed Steps 1–6, Step 6B and Step 7 (see §5, §22 and §23).** Drive, OAuth, sync execution, the service worker, hosting, deployment and any later step still require separate, explicit authorization.
 - **Governing brief:** `Nifty200_Screener_PWA_Brief_v8.md`, unchanged. The amendments in §3 take precedence over the brief where they conflict. The brief itself is not edited.
 - **Supporting evidence:** `INVESTIGATION_REPORT.md`
 
@@ -223,7 +223,7 @@ Still open:
 
 | Action | Authorized? |
 |---|---|
-| Implementation, scaffolding, package installs, git — Steps 1–6 (completed) and Step 6B only | **Yes** (updated 2026-09-29; see §22). Nothing beyond Step 6B is authorized. |
+| Implementation, scaffolding, package installs, git — Steps 1–6 (completed), Step 6B and Step 7 (local-first release hardening) only | **Yes** (updated 2026-09-29; see §22 and §23). Nothing beyond Step 7 is authorized. |
 | Drive, OAuth, sync execution, service worker, hosting, deployment, or any later step | **No.** Each needs its own explicit approval. |
 | Google Cloud project / OAuth client creation | **No.** The owner performs this personally. |
 | Cloudflare account / project / deployment | **No** |
@@ -933,3 +933,29 @@ A PR review of the Step 6 branch (`main...codex/step-6-portable-backup`) raised 
 **Verification (Node 24.20.0):** `npm run verify` (format, lint, svelte-check 448 files 0 errors/warnings, build): unit 612 -> **631** passed (+19: 10 `reviewData`, 6 `reviewExport`, 2 `backupLock`, 1 `route`). Playwright across chromium + msedge: 86 -> **102** passed (+16 = 8 scenarios x 2). Chromium 153.0.8010.12, Microsoft Edge 154.0.4258.37, Playwright 1.63.0.
 
 **Out of scope, untouched:** Drive, OAuth, sync execution, account binding, service worker, hosting, deployment, deletion, variant promotion or overwrite, row-level diff, aliasing, `DB_VERSION`, CSV grammar, metrics, envelope hashing. `Nifty200_Screener_PWA_Brief_v8.md` and `samples/` are unchanged.
+
+## 23. Step 7: local-first release hardening (2026-09-29)
+
+**Authorization (this entry only):** the owner approved Step 7 (local-first release hardening) alone. **Still unauthorized, each needing its own explicit approval:** service worker / manifest / offline mode, Drive, OAuth, sync execution, account binding, hosting, deployment, and any later step. No `DB_VERSION`, storage schema, CSV grammar, metric, envelope, backup-schema, `samples/` or brief change.
+
+**Decisions (owner, 2026-09-29):** hardening scope only; dev dependencies `fast-check` 4.10.2 and `@axe-core/playwright` 4.13.0 (exact-pinned, dev only); the bundle scanner lives in `scripts/` and runs inside `npm run verify`; the three notices are persistent in the app shell; `RELEASE_REPORT.md` is committed as a blank template only.
+
+**Delivered**
+- **Persistent notices** (`src/lib/Notices.svelte`, rendered by `App.svelte` on every route, before storage opens): "No in-app run deletion in v1.", "Data is stored unencrypted in this browser.", "Hashes check integrity only; they do not prove authenticity."
+- **Production-output scanner** (`scripts/scan-dist.mjs`, `npm run scan:dist`, now the last step of `npm run verify`): fails on source maps or `sourceMappingURL` references, JWT / Google access token / API key / OAuth client secret / bearer token / private key shapes, sample paths or filenames, real-looking ISINs, and `.csv` / `.sqlite` / `.db` / backup / `.env` files. Findings print the rule and file only, never the matched text.
+- **Fuzz / property tests** (`tests/unit/fuzz.test.ts`, fixed seed 20260929): arbitrary and corrupted CSV bytes never throw; any change to a valid envelope stops it validating as valid; ingesting a mutated envelope never commits it and quarantines the exact bytes; arbitrary bytes never leave a run; arbitrary and corrupted backup files never throw and preview with zero writes.
+- **Browser tests:** cross-tab `versionchange` (the other tab's upgrade completes and this tab prompts a reload); restore blocked while another tab holds the restore lock and completing on release; two tabs restoring the same backup produce exactly one run; oversized file / row / column inputs rejected with zero writes to `runs`, `run_variants` and `quarantine_items`; keyboard-only import; console output free of filenames and CSV values; axe (WCAG 2.0/2.1/2.2 A/AA tags) on history, run detail, comparison, backup, review and the review dialog.
+- **Real defect found and fixed (regression-tested by the axe test):** the "provider-reported, not the app ratio" badge used `--color-gold` on `--color-gold-bg` at 4.34:1, below the 4.5:1 AA minimum (D1). Added `--color-gold-text` (`#735b10`, 5.76:1) for that badge only.
+- **`RELEASE_REPORT.md`:** blank template only; no completed report exists.
+
+**Fail-before / pass-after evidence**
+- Notices: 2 of 2 notice tests and the console-privacy test's setup failed before `Notices.svelte` existed (no such region); pass after.
+- Axe: failed before the contrast fix (`color-contrast`, serious, 1 node, ratio 4.34); pass after.
+- Scanner: `scanDist.test.ts` failed to load (module missing) before `scripts/scan-dist.mjs`; a first draft's ISIN pattern was one character too long and failed its own test, then fixed. A `.map` planted in a real `dist/` made `npm run scan:dist` exit 1; removing it exits 0.
+- Gates whose behaviour already existed were checked by temporary mutation, each reverted with `git checkout`, then re-run green: removing the restore lock failed the cross-tab lock test and both `backupLock` unit tests; disabling the `versionchange` prompt and, separately, the connection close failed the versionchange test; raising the file-size limit failed the oversize test; skipping the envelope-hash check failed the fuzz property (counterexample found by fast-check). The fuzz suites found no new production bug.
+
+**Verification (Node 24.20.0):** `npm run verify` (now including `scan:dist`): unit 631 -> **652** passed (+21: 7 fuzz, 14 scanner). Playwright across Chromium 153.0.8010.12 and Microsoft Edge 154.0.4258.37 (Playwright 1.63.0): 102 -> **124** passed (+22 = 11 new tests x 2 browsers); the three cross-tab tests also passed 3 consecutive repeats in both browsers (18/18).
+
+**Dependency review:** `npm audit` (all severities, including dev): 0 vulnerabilities. Licences (from `package-lock.json` / installed `package.json`): production — MIT 6, Apache-2.0 1, BSD-3-Clause 1, ISC 1; development — MIT 150, Apache-2.0 22, MPL-2.0 14, BSD-2-Clause 8, ISC 7, BSD-3-Clause 2, BlueOak-1.0.0 1. No unlicensed or copyleft-strong entries. This is evidence, not proof.
+
+**Out of scope, untouched:** service worker / offline, Drive, OAuth, sync, hosting, deployment, deletion, and all schemas and grammar listed above.

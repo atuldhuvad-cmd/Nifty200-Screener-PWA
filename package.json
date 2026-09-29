@@ -18,7 +18,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "verify": "npm run format:check && npm run lint && npm run check && npm run test && npm run build"
+    "scan:dist": "node scripts/scan-dist.mjs dist",
+    "verify": "npm run format:check && npm run lint && npm run check && npm run test && npm run build && npm run scan:dist"
   },
   "dependencies": {
     "ajv": "8.20.0",
@@ -28,6 +29,7 @@
     "idb": "8.0.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
     "@sveltejs/vite-plugin-svelte": "7.3.1",
@@ -37,6 +39,7 @@
     "eslint": "10.11.0",
     "eslint-plugin-svelte": "3.23.0",
     "fake-indexeddb": "6.2.5",
+    "fast-check": "4.10.2",
     "globals": "17.12.0",
     "prettier": "3.9.9",
     "prettier-plugin-svelte": "4.1.1",

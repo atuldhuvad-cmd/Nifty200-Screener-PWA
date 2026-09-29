@@ -12,6 +12,7 @@
   import { getDatabase } from './lib/db';
   import ImportForm from './lib/ImportForm.svelte';
   import MultipartImportForm from './lib/MultipartImportForm.svelte';
+  import Notices from './lib/Notices.svelte';
   import RunComparison from './lib/RunComparison.svelte';
   import RunDetail from './lib/RunDetail.svelte';
   import Review from './lib/Review.svelte';
@@ -87,6 +88,8 @@
 
 <main>
   <h1>Nifty 200 Screener</h1>
+
+  <Notices />
 
   {#if reloadNeeded}
     <p role="alert" class="n200-badge n200-badge--warning">

@@ -5,6 +5,7 @@
   --color-border: #706b5c;
   --color-gold: #8a6d1f;
   --color-gold-bg: #fbf1d3;
+  --color-gold-text: #735b10; /* 5.76:1 on --color-gold-bg (AA); --color-gold alone is 4.34:1 */
   --color-error: #a6280f;
   --color-error-bg: #fbe9e6;
   --color-warning: #7a4c00;
@@ -96,6 +97,6 @@ td {
 }
 
 .n200-badge--gold {
-  color: var(--color-gold);
+  color: var(--color-gold-text);
   background: var(--color-gold-bg);
 }
