@@ -34,6 +34,7 @@ const fakeJwt = [
   'abcdefghijklmnopqrstuvwxyz012345',
 ].join('.');
 const fakeClientSecret = ['GOCSPX', 'abcdefghijklmnop0123456789'].join('-');
+const fakeGithubToken = ['ghp', 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8'].join('_');
 const fakeGoogleToken = ['ya29', 'a0AfH6SMBfakefakefakefakefakefakefake01'].join('.');
 
 describe('scanDist', () => {
@@ -66,6 +67,7 @@ describe('scanDist', () => {
     ],
     ['private key block', '-----BEGIN PRIVATE KEY-----\nMIIB', 'PRIVATE_KEY'],
     ['OAuth client secret', `const client_secret = "${fakeClientSecret}";`, 'OAUTH_CLIENT_SECRET'],
+    ['GitHub token', `const t = "${fakeGithubToken}";`, 'GITHUB_TOKEN'],
     ['Google API key', `const k = "AIza${'x'.repeat(35)}";`, 'GOOGLE_API_KEY'],
   ])('fails on a planted %s', (_label, content, rule) => {
     const dir = makeDist({ 'assets/index.js': content });
@@ -87,6 +89,24 @@ describe('scanDist', () => {
   it('fails when a .csv or backup export is bundled', () => {
     const dir = makeDist({ 'assets/leak.csv': 'a,b', 'n200-backup-v1-x.json': '{}' });
     expect(rules(dir)).toEqual(expect.arrayContaining(['PRIVATE_FILE_TYPE']));
+  });
+
+  it.each(['.env', '.env.production', 'assets/.env.local', 'secret.pem', 'cert.p12', 'id.pfx'])(
+    'fails on private file %s',
+    (name) => {
+      const dir = makeDist({ [name]: 'x' });
+      expect(rules(dir)).toContain('PRIVATE_FILE_TYPE');
+    },
+  );
+
+  it.each([
+    'assets/.environment-notes.txt',
+    'assets/environment.js',
+    'assets/key.js',
+    'assets/pem-utils.js',
+  ])('does not flag the innocent file name %s', (name) => {
+    const dir = makeDist({ [name]: 'x' });
+    expect(scan(dir)).toEqual([]);
   });
 
   it('reports the offending file but never the matched secret text', () => {

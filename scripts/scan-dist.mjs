@@ -16,6 +16,7 @@ const CONTENT_RULES = [
   ['GOOGLE_ACCESS_TOKEN', /\bya29\.[A-Za-z0-9_-]{20,}/],
   ['GOOGLE_API_KEY', /\bAIza[A-Za-z0-9_-]{35}\b/],
   ['OAUTH_CLIENT_SECRET', /\bGOCSPX-[A-Za-z0-9_-]{16,}/],
+  ['GITHUB_TOKEN', /\bgh[pousr]_[A-Za-z0-9]{36}\b/],
   ['BEARER_TOKEN', /\bBearer\s+[A-Za-z0-9._~+/-]{16,}/],
   ['PRIVATE_KEY', /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/],
   // Private research inputs must never ship: sample paths/names and real-looking ISINs.
@@ -27,7 +28,10 @@ const CONTENT_RULES = [
 /** @type {[string, RegExp][]} */
 const FILE_RULES = [
   ['SOURCE_MAP', /\.map$/i],
-  ['PRIVATE_FILE_TYPE', /\.(csv|sqlite|db)$|(^|[\\/])n200-backup-v[^\\/]*\.json$|(^|[\\/])\.env/i],
+  [
+    'PRIVATE_FILE_TYPE',
+    /\.(csv|sqlite|db|pem|p12|pfx)$|(^|[\\/])n200-backup-v[^\\/]*\.json$|(^|[\\/])\.env(\.[^\\/]*)?$/i,
+  ],
 ];
 
 /**
