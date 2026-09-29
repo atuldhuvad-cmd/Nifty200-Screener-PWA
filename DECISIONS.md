@@ -1,7 +1,7 @@
 # Nifty 200 Screener PWA: Decisions Record
 
 - **Date:** 2026-09-27
-- **Status:** pre-implementation decisions confirmed by the project owner. **This document does not authorize implementation.** Implementation begins only after separate, explicit approval.
+- **Status:** pre-implementation decisions confirmed by the project owner. **Implementation is authorized only for the completed Steps 1–6 and Step 6B (see §5 and §22).** Drive, OAuth, sync execution, the service worker, hosting, deployment and any later step still require separate, explicit authorization.
 - **Governing brief:** `Nifty200_Screener_PWA_Brief_v8.md`, unchanged. The amendments in §3 take precedence over the brief where they conflict. The brief itself is not edited.
 - **Supporting evidence:** `INVESTIGATION_REPORT.md`
 
