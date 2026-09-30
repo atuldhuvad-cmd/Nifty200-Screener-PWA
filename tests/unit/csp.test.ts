@@ -80,9 +80,16 @@ describe('the page CSP (Step 10): loosened only for the exact Google hosts neede
   });
 
   it('opens the OAuth host only for the one revoke URL, not the whole host', () => {
+    const hostOf = (source: string): string | null => {
+      try {
+        return new URL(source).hostname;
+      } catch {
+        return null; // a keyword or hash, not a URL
+      }
+    };
     const oauth = Object.values(csp)
       .flat()
-      .filter((x) => x.includes('oauth2.googleapis.com'));
+      .filter((source) => hostOf(source) === 'oauth2.googleapis.com');
     expect(oauth).toEqual(['https://oauth2.googleapis.com/revoke']);
   });
 });
