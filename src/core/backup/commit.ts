@@ -1,4 +1,5 @@
 import {
+  ACTIVITY_LOCK_NAME,
   ingestEnvelopeBytes,
   withRequiredLock,
   type IngestOutcome,
@@ -6,7 +7,9 @@ import {
 } from '../storage';
 import type { BackupFile } from './manifest';
 
-export const BACKUP_RESTORE_LOCK_NAME = 'n200-backup-restore';
+/** A restore holds the shared activity lock name exclusively (see `ACTIVITY_LOCK_NAME`), which
+ * also keeps a service-worker update from activating mid-restore. */
+export const BACKUP_RESTORE_LOCK_NAME = ACTIVITY_LOCK_NAME;
 
 /** `IngestOutcome` plus one kind this module alone can produce: a genuinely unexpected failure
  * (e.g. a storage-quota error) distinct from an ordinary data-quality `quarantined` outcome —

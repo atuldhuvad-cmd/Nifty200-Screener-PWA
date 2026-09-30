@@ -99,7 +99,7 @@ test.describe('Step 7: cross-tab behaviour', () => {
     await holder.goto('/');
     await holder.evaluate(() => {
       const w = window as unknown as { __releaseLock?: () => void; __lockHeld?: boolean };
-      void navigator.locks.request('n200-backup-restore', () => {
+      void navigator.locks.request('n200-activity', () => {
         w.__lockHeld = true;
         return new Promise<void>((resolve) => {
           w.__releaseLock = resolve;

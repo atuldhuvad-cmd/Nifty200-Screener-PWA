@@ -106,6 +106,9 @@ test.describe('Step 7: oversized input writes nothing', () => {
   for (const [name, make, message] of cases) {
     test(`${name} is rejected with a clear error and zero writes`, async ({ page }) => {
       await page.goto('/');
+      // Only touch IndexedDB directly once the app has opened (and created) its own database:
+      // a raw open of a database that does not exist yet would create an empty version-1 one.
+      await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
       const before = await storeCounts(page);
       await page.getByLabel('Choose a Nifty 200 CSV file').setInputFiles({
         name: 'oversize.csv',

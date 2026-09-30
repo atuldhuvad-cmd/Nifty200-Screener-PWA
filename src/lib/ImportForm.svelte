@@ -1,7 +1,12 @@
 <script lang="ts">
   import { analyzeCsvBytes, type CsvAnalysis } from '../core/csv';
   import { buildEnvelope, sha256Hex } from '../core/envelope';
-  import { commitNewRun, findRunsByOriginalFileHash, type N200Database } from '../core/storage';
+  import {
+    commitNewRun,
+    findRunsByOriginalFileHash,
+    withActivity,
+    type N200Database,
+  } from '../core/storage';
   import { describeImportError, describeImportWarning } from './importMessages';
   import PreviewTable from './PreviewTable.svelte';
 
@@ -101,7 +106,13 @@
     if (fileInputEl) fileInputEl.value = '';
   }
 
-  async function confirm(): Promise<void> {
+  /** The whole confirm-and-commit runs holding the shared activity lock, so an app update
+   * accepted in any open tab waits for it to finish. */
+  function confirm(): Promise<void> {
+    return withActivity(confirmCommit);
+  }
+
+  async function confirmCommit(): Promise<void> {
     if (
       !canConfirmCommit ||
       previewAnalysis === undefined ||

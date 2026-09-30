@@ -15,9 +15,11 @@ export type { IngestOutcome, ParsedCandidate, RoutingDecision } from './ingest';
 export { decideRouting, ingestEnvelopeBytes, parseIngestCandidate } from './ingest';
 export { REDACTED, sanitizeQuarantineDiscoveryMetadata } from './sanitizeDiscoveryMetadata';
 export {
+  ACTIVITY_LOCK_NAME,
   isWebLocksAvailable,
   WEB_LOCKS_UNAVAILABLE_CODE,
   WebLocksUnavailableError,
+  withActivity,
   withMigrationLock,
   withRequiredLock,
 } from './locks';

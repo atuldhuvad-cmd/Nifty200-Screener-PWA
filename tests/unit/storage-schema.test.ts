@@ -170,10 +170,10 @@ describe('withMigrationLock: single-tab fallback when Web Locks are unavailable'
       },
     };
     const outcome = await withStubbedNavigator({ locks: fakeLocks }, () =>
-      withMigrationLock('n200-schema-migration', async () => 'ok'),
+      withMigrationLock('n200-activity', async () => 'ok'),
     );
     expect(outcome).toEqual({ usedLock: true, result: 'ok' });
-    expect(calls).toEqual(['n200-schema-migration']);
+    expect(calls).toEqual(['n200-activity']);
   });
 });
 
