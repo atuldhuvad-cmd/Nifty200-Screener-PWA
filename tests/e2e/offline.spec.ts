@@ -127,6 +127,30 @@ async function workerState(page: Page): Promise<{ waiting: boolean; installing: 
   });
 }
 
+/** How long an accepted update may take to finish and reload the tab. The app bounds activation
+ * itself (a visible failure after 15 s), so a healthy run finishes far inside this; the ceiling
+ * only has to tolerate several browsers starting in parallel on a busy machine. If the app shows
+ * its failure notice the poll reports that instead of a title. */
+const UPDATE_DEADLINE_MS = 40_000;
+
+async function expectReleaseServed(page: Page, marker: RegExp): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        try {
+          if ((await page.getByRole('alert', { name: 'App updates' }).count()) > 0) {
+            return 'update-failed-notice';
+          }
+          return await page.title();
+        } catch {
+          return 'navigating';
+        }
+      },
+      { timeout: UPDATE_DEADLINE_MS },
+    )
+    .toMatch(marker);
+}
+
 function updates(page: Page) {
   return page.getByRole('status', { name: 'App updates' });
 }
@@ -237,6 +261,11 @@ test.describe('Step 8: user-accepted updates', () => {
       expect(await checkForUpdate(page)).toBe('installed');
       const notice = updates(page);
       await expect(notice).toContainText('A new version of Nifty 200 Screener is ready.');
+      // The consequence is stated BEFORE the user accepts, not after.
+      await expect(notice).toContainText(
+        'Updating reloads this page and discards any import preview you have not confirmed.',
+      );
+      await expect(notice).toContainText('Runs already saved on this device are not affected.');
       // Never automatic: the candidate has installed and is only waiting; no takeover has
       // happened and nothing has even asked for the activity lock.
       await expect(page).toHaveTitle(/\(v1\)/);
@@ -254,7 +283,7 @@ test.describe('Step 8: user-accepted updates', () => {
       const accept = notice.getByRole('button', { name: 'Update now' });
       await accept.focus();
       await page.keyboard.press('Enter');
-      await expect(page).toHaveTitle(/\(v2\)/);
+      await expectReleaseServed(page, /\(v2\)/);
       await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null))
         .toBe(true);
@@ -268,7 +297,7 @@ test.describe('Step 8: user-accepted updates', () => {
       await checkForUpdate(page);
       await expect(updates(page)).toContainText('is ready');
       await updates(page).getByRole('button', { name: 'Update now' }).click();
-      await expect(page).toHaveTitle(/\(v3\)/);
+      await expectReleaseServed(page, /\(v3\)/);
       const afterV3 = await cacheSummary(page);
       expect(Object.keys(afterV3).filter((n) => n.startsWith('n200-shell-'))).toHaveLength(2);
       expect(
@@ -433,18 +462,61 @@ test.describe('Step 8: updates wait for operations in every open tab', () => {
         } else if (activity === 'restore') {
           await expect(tabB.getByText('Import complete')).toBeVisible();
         }
-        await expect(tabA).toHaveTitle(/\(v2\)/);
+        await expectReleaseServed(tabA, /\(v2\)/);
         await expect(updates(tabB)).toContainText('updated in another tab');
         if (activity !== 'migration') expect(await runCount(tabB)).toBe(1);
 
         // The other tab keeps working until its user chooses to reload.
         await expect(tabB).toHaveTitle(/\(v1\)/);
         await updates(tabB).getByRole('button', { name: 'Reload now' }).click();
-        await expect(tabB).toHaveTitle(/\(v2\)/);
+        await expectReleaseServed(tabB, /\(v2\)/);
         if (activity !== 'migration') expect(await runCount(tabB)).toBe(1);
       });
     });
   }
+});
+
+test.describe('Step 8: a replaced waiting worker', () => {
+  test('an update queued behind an operation still succeeds when a newer release replaces the waiting one', async ({
+    page,
+  }) => {
+    await withServers(async ({ server, v2 }) => {
+      const v3 = makeVariant('v3');
+      await settle(page, server.url, /\(v1\)/);
+      server.setRoot(v2);
+      expect(await checkForUpdate(page)).toBe('installed');
+      await expect(updates(page)).toContainText('is ready');
+
+      // An operation is running (held open), so the accepted update has to queue.
+      await page.evaluate(() => {
+        const w = window as unknown as { __release: () => void };
+        void navigator.locks.request(
+          'n200-activity',
+          () =>
+            new Promise<void>((resolve) => {
+              w.__release = resolve;
+            }),
+        );
+      });
+      await expect.poll(() => activityLockHeld(page)).toEqual(['exclusive']);
+      await updates(page).getByRole('button', { name: 'Update now' }).click();
+      await expect(updates(page)).toContainText('Waiting for imports, restores and migrations');
+      await expect.poll(() => pendingActivityRequests(page)).toEqual(['exclusive']);
+
+      // A newer release is deployed while queued: the v2 candidate becomes redundant.
+      server.setRoot(v3);
+      expect(await checkForUpdate(page)).toBe('installed');
+      // The waiting notice must not be replaced by a second "Update now" while queued.
+      await expect(updates(page)).toContainText('Waiting for imports, restores and migrations');
+      await expect(updates(page).getByRole('button', { name: 'Update now' })).toHaveCount(0);
+
+      await page.evaluate(() => {
+        (window as unknown as { __release: () => void }).__release();
+      });
+      // Well inside the 15 s activation timeout: the newer waiting worker is activated.
+      await expectReleaseServed(page, /\(v3\)/);
+    });
+  });
 });
 
 test.describe('Step 8: failed installs keep the working version', () => {

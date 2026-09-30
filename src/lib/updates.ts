@@ -44,6 +44,9 @@ export function startUpdates(onState: (state: UpdateState) => void): UpdateContr
   const controlledAtStart = container.controller !== null;
 
   const announceIfWaiting = (): void => {
+    // While this tab's own accepted update is in progress the notice must keep showing it; a
+    // newer candidate arriving meanwhile is picked up when the lock is held (`resolveWorker`).
+    if (pending !== undefined) return;
     if (registration?.waiting != null && container.controller !== null) {
       onState({ kind: 'available' });
     }
@@ -75,7 +78,10 @@ export function startUpdates(onState: (state: UpdateState) => void): UpdateContr
   return {
     async accept() {
       const waiting = registration?.waiting;
-      if (waiting == null) return;
+      if (waiting == null) {
+        onState({ kind: 'none' });
+        return;
+      }
       initiatedHere = true;
       pending = new AbortController();
       onState({ kind: 'waiting' });
@@ -83,6 +89,7 @@ export function startUpdates(onState: (state: UpdateState) => void): UpdateContr
         await activateWaitingWorker({
           locks: getLocks(),
           worker: waiting,
+          resolveWorker: () => registration?.waiting ?? null,
           timeoutMs: ACTIVATION_TIMEOUT_MS,
           signal: pending.signal,
           onLockAcquired: () => {

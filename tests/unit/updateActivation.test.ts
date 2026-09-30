@@ -177,6 +177,60 @@ describe('activateWaitingWorker', () => {
     expect(worker.posted).toEqual([]);
   });
 
+  it('a waiting worker replaced while queued is re-resolved once the lock is held, without a timeout', async () => {
+    const locks = new FakeLocks();
+    const replaced = new FakeWorker();
+    const current = new FakeWorker();
+    const releaseImport = await locks.acquire('shared');
+    let waiting: FakeWorker | null = replaced;
+    const done = activateWaitingWorker({
+      locks,
+      worker: replaced,
+      resolveWorker: () => waiting,
+      timeoutMs: 10_000,
+    });
+    await tick();
+    // A newer release is installed while the update waits: the old candidate is now redundant.
+    replaced.state = 'redundant';
+    waiting = current;
+    releaseImport();
+    await tick();
+    expect(replaced.posted).toEqual([]);
+    expect(current.posted).toEqual([{ type: 'SKIP_WAITING' }]);
+    current.emit('activated');
+    await done;
+  });
+
+  it('fails promptly, without posting, when no valid waiting worker remains after the lock is held', async () => {
+    const locks = new FakeLocks();
+    const replaced = new FakeWorker();
+    const releaseImport = await locks.acquire('shared');
+    let waiting: FakeWorker | null = replaced;
+    const done = activateWaitingWorker({
+      locks,
+      worker: replaced,
+      resolveWorker: () => waiting,
+      timeoutMs: 10_000,
+    });
+    await tick();
+    replaced.state = 'redundant';
+    waiting = null;
+    releaseImport();
+    await expect(done).rejects.toMatchObject({ code: 'NO_WAITING_WORKER' });
+    expect(replaced.posted).toEqual([]);
+    expect(locks.held()).toBe(0);
+  });
+
+  it('a worker that is already redundant fails promptly instead of waiting for the timeout', async () => {
+    const locks = new FakeLocks();
+    const worker = new FakeWorker();
+    worker.state = 'redundant';
+    await expect(activateWaitingWorker({ locks, worker, timeoutMs: 10_000 })).rejects.toMatchObject(
+      { code: 'NO_WAITING_WORKER' },
+    );
+    expect(worker.posted).toEqual([]);
+  });
+
   it('fails closed without Web Locks and never posts', async () => {
     const worker = new FakeWorker();
     await expect(

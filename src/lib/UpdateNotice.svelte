@@ -21,21 +21,33 @@
 
 {#if state.kind === 'failed'}
   <div role="alert" aria-label="App updates" class="n200-badge n200-badge--error update">
-    <p>
-      The update could not be applied ({state.code}). The version you are using keeps working, and
-      nothing was changed.
-    </p>
-    <button type="button" onclick={accept}>Try again</button>
+    {#if state.code === 'NO_WAITING_WORKER'}
+      <p>
+        The update you accepted was replaced or withdrawn. The version you are using keeps working,
+        and nothing was changed. You will be told when the next release is ready.
+      </p>
+    {:else}
+      <p>
+        The update could not be applied ({state.code}). The version you are using keeps working, and
+        nothing was changed.
+      </p>
+      <button type="button" onclick={accept}>Try again</button>
+    {/if}
   </div>
 {:else if state.kind !== 'none'}
   <div role="status" aria-label="App updates" class="n200-badge n200-badge--gold update">
     {#if state.kind === 'available'}
       <p>A new version of Nifty 200 Screener is ready.</p>
+      <p>
+        Updating reloads this page and discards any import preview you have not confirmed. Runs
+        already saved on this device are not affected.
+      </p>
       <button type="button" onclick={accept}>Update now</button>
     {:else if state.kind === 'waiting'}
       <p>
         Waiting for imports, restores and migrations in all open tabs to finish before
-        updating&hellip;
+        updating&hellip; This page will then reload, discarding any import preview you have not
+        confirmed.
       </p>
       <button
         type="button"

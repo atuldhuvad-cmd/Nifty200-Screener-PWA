@@ -91,7 +91,15 @@ export interface OpenDatabaseOptions {
 
 export interface OpenDatabaseResult {
   db: N200Database;
-  /** Whether the schema migration actually ran under a real, cross-tab-coordinating Web Lock. */
+  /**
+   * Whether this tab can coordinate with other tabs through Web Locks.
+   * - When a schema migration ran, it is whether that migration ran under the exclusive activity
+   *   lock (a migration never runs uncoordinated: without Web Locks the open fails closed).
+   * - When the database was already at the current version, no migration ran and no lock was
+   *   taken (a plain open must never queue behind a long restore in another tab); the value then
+   *   just reports whether Web Locks are available, so `singleTabWarning` still tells a future
+   *   sync layer that cross-tab coordination is impossible.
+   */
   usedLock: boolean;
   /** `!usedLock` — Web Locks were unavailable, so only this tab's activity is coordinated.
    * A future sync layer must check this and refuse to start concurrent sync while it's true. */
