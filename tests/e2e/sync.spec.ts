@@ -114,6 +114,9 @@ test.describe('Step 10: connect, sync and restore through the UI', () => {
     await syncNow(d.page);
     await expect(result(d.page)).toContainText('Sync finished.');
     await expect(result(d.page)).toContainText('Uploaded: 1');
+    await syncNow(d.page);
+    await expect(result(d.page)).toContainText('Files checked in Drive: 1');
+    await expect(result(d.page)).toContainText('Unchanged: 1');
     expect(jsonFiles(drive)).toHaveLength(1);
     expect(jsonFiles(drive)[0]?.name).toMatch(/^run-[0-9a-f-]{36}\.json$/);
 
@@ -192,6 +195,7 @@ test.describe('Step 10: runs missing from Drive', () => {
     const { drive, d, oldId } = await missingDevice(browser);
     await d.page.getByRole('button', { name: /^Restore run .* to Drive$/ }).click();
     await expect(d.page.getByText('The run was restored to Google Drive.')).toBeVisible();
+    await expect(result(d.page)).toContainText('may be out of date');
     const files = jsonFiles(drive);
     expect(files).toHaveLength(1);
     expect(files[0]?.id).not.toBe(oldId);
@@ -203,11 +207,36 @@ test.describe('Step 10: runs missing from Drive', () => {
     const { drive, d } = await missingDevice(browser);
     await d.page.getByRole('button', { name: /^Keep run .* on this device only$/ }).click();
     await expect(d.page.getByText('The run will stay on this device only.')).toBeVisible();
+    await expect(result(d.page)).toContainText('may be out of date');
     await syncNow(d.page);
+    await expect(result(d.page)).not.toContainText('may be out of date');
     expect(jsonFiles(drive)).toHaveLength(0);
     await d.page.getByRole('link', { name: 'Run history' }).click();
     const history = d.page.locator('table', { hasText: 'Sync state' });
     await expect(history.getByRole('cell', { name: 'local_only', exact: true })).toBeVisible();
+    await d.context.close();
+  });
+});
+
+test.describe('Step 11: trash detection despite a lagging search index', () => {
+  test('a trashed file that search still lists is reported missing on the very next Sync now', async ({
+    browser,
+  }) => {
+    const drive = new FakeDrive();
+    const d = await newDevice(browser, drive);
+    await importRun(d.page);
+    await openSync(d.page);
+    await connect(d.page);
+    await syncNow(d.page);
+    const file = jsonFiles(drive)[0];
+    if (!file) throw new Error('no file');
+    drive.lagTrashInSearch = true;
+    drive.trash(file.id);
+    await syncNow(d.page);
+    await expect(result(d.page)).toContainText('Missing from Drive: 1');
+    await expect(d.page.getByRole('heading', { name: /Runs missing from Drive/ })).toBeVisible();
+    // Detection is read-only: nothing was re-uploaded or untrashed.
+    expect(jsonFiles(drive).filter((f) => !f.trashed)).toHaveLength(0);
     await d.context.close();
   });
 });

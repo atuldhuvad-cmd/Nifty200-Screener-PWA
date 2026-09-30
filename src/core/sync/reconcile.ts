@@ -31,7 +31,9 @@ export type FileResult =
   | 'quarantined'
   | 'unsupported_schema'
   | 'duplicate_remote'
-  | 'too_large';
+  | 'too_large'
+  /** The listing itself says the file is in Drive's Trash (a lagging search index): not read. */
+  | 'trashed';
 
 export interface FileOutcome {
   fileId: string;
@@ -51,6 +53,8 @@ export interface DiscoveryReport {
   activeFolderAction: ActiveFolderAction;
   /** Run ids newly marked `remote_missing` by this pass. */
   missing: string[];
+  /** Synced runs whose Drive file could not be checked this pass (a transient failure). */
+  unverified: number;
 }
 
 /** Records a verified remote copy for a run: Drive metadata, then syncing -> synced. */
@@ -203,17 +207,47 @@ export async function discoverAndReconcile(ctx: SyncContext): Promise<DiscoveryR
 
   const outcomes: FileOutcome[] = [];
   for (const file of files) {
+    if (file.trashed === true) {
+      // A trashed file cannot be downloaded. The per-run probe below decides what it means.
+      outcomes.push({
+        fileId: file.id,
+        runId: runsByFileId.get(file.id)?.run_id ?? null,
+        orphaned: false,
+        result: 'trashed',
+      });
+      continue;
+    }
     outcomes.push(await reconcileFile(ctx, file, runsByFileId, knownFolders));
   }
 
-  const seen = new Set(files.map((f) => f.id));
+  // Drive's search index can lag behind a trash: a trashed file may still be listed. So every
+  // synced run's file is probed directly by ID, whether or not the search listed it. Probing
+  // only reads; a run can only become `remote_missing`, never be deleted or re-uploaded.
   const missing: string[] = [];
+  let unverified = 0;
   for (const run of runs) {
     const fileId = run.sync.drive?.file_id;
-    if (fileId === undefined || seen.has(fileId)) continue;
+    if (fileId === undefined) continue;
     const current = await getRun(ctx.db, run.run_id);
     if (current?.sync.state !== 'synced') continue;
-    const probe = await ctx.client.probeFile(fileId, signal);
+    if (ctx.signal?.aborted === true) throw new DriveError('cancelled');
+    let probe: Awaited<ReturnType<typeof ctx.client.probeFile>>;
+    try {
+      probe = await ctx.client.probeFile(fileId, signal);
+    } catch (error) {
+      // Only an expired authorization or a cancellation ends the pass. Any other failure means
+      // this one file could not be checked right now: the run stays `synced` (nothing proves it
+      // is missing), it is counted, and the rest of the sync carries on.
+      if (
+        error instanceof DriveError &&
+        error.kind !== 'unauthorized' &&
+        error.kind !== 'cancelled'
+      ) {
+        unverified += 1;
+        continue;
+      }
+      throw error;
+    }
     if (probe.state === 'missing' || probe.state === 'trashed') {
       const moved = await applyTransition(ctx.db, run.run_id, { type: 'REMOTE_MISSING_DETECTED' });
       if (moved.ok) missing.push(run.run_id);
@@ -226,5 +260,6 @@ export async function discoverAndReconcile(ctx: SyncContext): Promise<DiscoveryR
     files: outcomes,
     activeFolderAction,
     missing,
+    unverified,
   };
 }

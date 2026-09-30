@@ -1,7 +1,7 @@
 # Nifty 200 Screener PWA: Decisions Record
 
 - **Date:** 2026-09-27
-- **Status:** pre-implementation decisions confirmed by the project owner. **Implementation is authorized only for the completed Steps 1–6, Step 6B, Step 7, Step 8, Step 9 and Step 10 (see §5, §22, §23, §25, §26 and §27).** Step 11, hosting, Cloudflare, a production origin, OAuth publishing, automatic or background sync, deletion, encryption, Android and any later step still require separate, explicit authorization.
+- **Status:** pre-implementation decisions confirmed by the project owner. **Implementation is authorized only for the completed Steps 1–6, Step 6B, Step 7, Step 8, Step 9, Step 10 and Step 11 (see §5, §22, §23, §25, §26, §27 and §28).** Hosting, Cloudflare, a production origin, OAuth publishing, automatic or background sync, deletion, encryption, Android and any later step still require separate, explicit authorization.
 - **Governing brief:** `Nifty200_Screener_PWA_Brief_v8.md`, unchanged. The amendments in §3 take precedence over the brief where they conflict. The brief itself is not edited.
 - **Supporting evidence:** `INVESTIGATION_REPORT.md`
 
@@ -223,8 +223,8 @@ Still open:
 
 | Action | Authorized? |
 |---|---|
-| Implementation, scaffolding, package installs, git — Steps 1–6 (completed), Step 6B, Step 7, Step 8, Step 9 (Drive sync engine core against a FAKE Drive) and Step 10 (localhost Google Drive connection and user-initiated sync, using the Step 9 engine) only | **Yes** (updated 2026-09-30; see §22, §23, §25, §26 and §27). Nothing beyond Step 10 is authorized. |
-| Step 11, hosting, deployment, a production origin, OAuth consent-screen publishing, automatic or background sync, deletion from Drive, encryption, Android, or any later step | **No.** Each needs its own explicit approval. |
+| Implementation, scaffolding, package installs, git — Steps 1–6 (completed), Step 6B, Step 7, Step 8, Step 9 (Drive sync engine core against a FAKE Drive), Step 10 (localhost Google Drive connection and user-initiated sync, using the Step 9 engine) and Step 11 (sync summary clarity and trash-detection hardening, §28) only | **Yes** (updated 2026-09-30; see §22, §23, §25, §26, §27 and §28). Nothing beyond Step 11 is authorized. |
+| Hosting, deployment, a production origin, OAuth consent-screen publishing, automatic or background sync, deletion from Drive, encryption, Android, or any later step | **No.** Each needs its own explicit approval. |
 | First real Google contact | **Yes, only on `http://localhost` with a dedicated test Google account, through the owner's manual smoke test (§27).** Automated tests never contact Google. |
 | Google Cloud project / OAuth client creation | **No.** The owner performs this personally. |
 | Cloudflare account / project / deployment | **No** |
@@ -1068,3 +1068,26 @@ Test and script changes only; no app behavior, schema, `DB_VERSION`, CSV grammar
 **Manual smoke result (2026-09-30, localhost, dedicated test account, stopped by owner decision):** PASS: 1 no Google traffic before Connect; 2 consent lists only "See, edit, create, and delete only the specific Google Drive files you use with this app" (`drive.file`, no email/profile); 3 Connected with no CSP errors (after the hash fix); 4 synthetic run uploaded, `synced`, file in Drive; 5 fresh-device restore in Edge with no duplicate; 7 missing-file detection, recovery from Drive's Trash, Restore to Drive and Keep local only; 10 Disconnect/revoke with no CSP errors (after the revoke-URL fix). Low findings, not blockers, recorded in `SMOKE_TEST_STEP10.md`: F1 summary does not count unchanged/skipped files; F2 stale summary after Restore to Drive; F3 Drive search can lag about a minute after trashing.
 
 **NOT TESTED:** manually: 6 conflict (covered by automated tests), 8 reconnect after revoke, 9 different account, 11 storage inspection, 12 keyboard/screen reader (8, 9, 11 and the keyboard part of 12 are covered by automated tests against the mock; no screen-reader pass). Also untested: quotas, 7-day test-mode token expiry, real-device and mobile browsers. Automated tests never contact Google.
+
+---
+
+## 28. Step 11: sync summary clarity and trash-detection hardening, with audit follow-ups (2026-09-30)
+
+**Authorization:** Step 11 (findings F1-F3 from `SMOKE_TEST_STEP10.md`), then the owner's full-project instruction to finish all locally executable work, audit it, complete `RELEASE_REPORT.md`, scan with Gitleaks, and prepare (not provision) hosting and OAuth setup. **Still unauthorized:** provisioning or deploying anything (Cloudflare, production origin), publishing OAuth, automatic or background sync, deletion, encryption, Android work and any access to `D:\Swing Trading`.
+
+**Changes**
+
+- **F1 (`syncController.ts`, `Sync.svelte`):** `SyncSummary` gains counts by category: `checked`, `unchanged`, `refreshed`, `alreadyPresent`, `unsupported`, `duplicate`, `tooLarge`, `trashedListed`, `unverified`. Counts only; no file names, Drive IDs or emails. Every checked file falls in exactly one category (asserted).
+- **F2:** `summaryStale` is set after Restore to Drive, Keep local only and choosing a folder, and cleared by the next Sync now or Disconnect. A sync that is blocked, cancelled, needs reconnect or fails now drops the previous counts instead of leaving them under the failure message (defect found in the audit).
+- **F3 (`reconcile.ts`):** every synced run's Drive file is probed directly by ID during Sync now, whether or not the search listed it. Read-only: a run can only become `remote_missing`; nothing is uploaded, untrashed or deleted. A listed file whose own metadata says it is trashed is not downloaded (`trashed`). A `403` probe is `inaccessible`, not missing. Any other probe failure (5xx, timeout, network, rate limit) leaves the run `synced` and is counted as `unverified`; only `401` (reconnect) and cancellation end the pass. Request growth: one sequential metadata GET per synced run per sync. Whether real Drive refuses to download a trashed file is INSUFFICIENT_DATA; the skip makes the result independent of the answer.
+- **Host headers (`public/_headers`, `scripts/headers-policy.mjs`):** `nosniff`, `Referrer-Policy: no-referrer`, `frame-ancestors 'none'` (additive: the page CSP stays the meta tag), `Cross-Origin-Opener-Policy: same-origin-allow-popups` (not `same-origin`, which would break the Google popup), a restrictive `Permissions-Policy`, `no-cache` for the shell and `sw.js`, immutable caching only for `/assets/*`. It names no origin. `scan:dist` now fails when the file is missing, drops a required header, names an origin, uses a wildcard or `unsafe-*` value, sets an unapproved header or marks anything else immutable; the exact meta CSP and Google host allowlist are unchanged. `build-sw.mjs` and the e2e `shellPaths` helper ignore `_headers` (it is host configuration, never precached). The preview server used by Playwright sends the same `/*` headers, so the whole e2e suite runs under them. `HOSTING_SETUP.md` documents the placeholders and owner steps.
+- **Final review fixes:** a Restore to Drive that needs a reconnect now drops the old counts; the preview server applies every block of `public/_headers` with the host's path matching (`headersForPath`, values from several matching blocks joined), so the cache rules are exercised by the e2e suite. `.gitleaksignore` lists the four reviewed Gitleaks findings by exact fingerprint (generated validators and redaction-test fixtures); detection of any other or new match is preserved and was checked with a canary.
+- **Docs:** `SMOKE_TEST_STEP11.md`; `RELEASE_REPORT.md` is now a completed, factual readiness report (verdict: not ready for production release) instead of a blank template.
+
+**Unchanged:** scopes, Google hosts, the meta CSP, `DB_VERSION` 3, schemas, envelopes, CSV grammar, backup format, `samples/`, the brief, the service-worker logic, dependencies.
+
+**Evidence (automated; Node 24.20.0, Chromium 153.0.8010.12, Edge 154.0.4258.37, Playwright 1.63.0; mock Drive and mock Google only):** `npm run verify` passes. Unit 982 -> **1019** (59 files). Playwright 180 -> **188** (94 per browser). `npm audit`: 0 vulnerabilities. Gitleaks 8.30.1 (checksum-verified official release): 4 findings in both history and tree, all reviewed as false positives and ignored by exact fingerprint; both scans then report no leaks (see `RELEASE_REPORT.md` §6).
+
+**NOT TESTED:** real Google and Drive behaviour for F3, reconnect after revoke, second-account mismatch, storage inspection, screen reader, manual install, Android, headers as served by a real host, COOP with the real sign-in popup. See `SMOKE_TEST_STEP11.md` and `HOSTING_SETUP.md`.
+
+**Release-candidate Git authorization (2026-09-30):** the owner confirmed intentionally public visibility and authorized branch `codex/step-11-sync-clarity-and-release-prep`, explicit-file staging, gated commit with the noreply identity, push and PR to `main`. No merge or deployment. OAuth stays in Testing; preferred future Cloudflare name is `n200-screener`, subject to availability; provisioning remains unauthorized.

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { jcsSha256Hex } from '../../src/core/envelope/canonicalHash';
+import { runFileQuery } from '../../src/core/sync/appProperties';
 import { discoverAndReconcile } from '../../src/core/sync/reconcile';
 import { selectActiveFolder, serializeEnvelope, uploadRun } from '../../src/core/sync/upload';
 import { countAtRiskRuns } from '../../src/core/storage/persistence';
@@ -368,6 +369,142 @@ describe('missing remote files (only on a device that previously synced the run)
     a.drive.trash((await getRun(a.db, A))?.sync.drive?.file_id ?? '');
     await discoverAndReconcile(a.ctx);
     expect((await getRun(a.db, A))?.sync.state).toBe('remote_missing');
+  });
+
+  it('a trashed file the search still lists (lagging index) is detected by the direct probe', async () => {
+    const a = await makeSyncHarness();
+    await addRun(a.db, A);
+    await uploaded(a, A);
+    const stale = await a.ctx.client.listFiles({ q: runFileQuery() });
+    expect(stale).toHaveLength(1);
+    a.drive.trash((await getRun(a.db, A))?.sync.drive?.file_id ?? '');
+    const lagging = {
+      ...a.ctx,
+      client: {
+        ...a.ctx.client,
+        listFiles: ({ q }: { q: string }) =>
+          q === runFileQuery() ? Promise.resolve(stale) : a.ctx.client.listFiles({ q }),
+      },
+    };
+    const report = await discoverAndReconcile(lagging);
+    expect(report.missing).toEqual([A]);
+    expect((await getRun(a.db, A))?.sync.state).toBe('remote_missing');
+    expect(jsonFiles(a).filter((f) => !f.trashed)).toHaveLength(0); // no re-upload, no untrash
+  });
+
+  it('a listed file that already shows as trashed is not downloaded, and its run is reported missing', async () => {
+    const a = await makeSyncHarness();
+    await addRun(a.db, A);
+    await uploaded(a, A);
+    const fileId = (await getRun(a.db, A))?.sync.drive?.file_id ?? '';
+    a.drive.lagTrashInSearch = true;
+    a.drive.trash(fileId);
+    const before = a.drive.requests.length;
+    const report = await discoverAndReconcile(a.ctx);
+    expect(report.files.map((f) => f.result)).toEqual(['trashed']);
+    expect(report.missing).toEqual([A]);
+    expect(a.drive.requests.slice(before).filter(isMedia)).toHaveLength(0);
+  });
+
+  it('a present, untrashed file stays synced and is probed read-only', async () => {
+    const a = await makeSyncHarness();
+    await addRun(a.db, A);
+    await uploaded(a, A);
+    const before = a.drive.requests.length;
+    const report = await discoverAndReconcile(a.ctx);
+    expect(report.missing).toEqual([]);
+    expect((await getRun(a.db, A))?.sync.state).toBe('synced');
+    const added = a.drive.requests.slice(before);
+    expect(added.every((r) => r.method === 'GET')).toBe(true);
+    expect(
+      added.some((r) => r.method === 'GET' && r.path.startsWith('/drive/v3/files/') && !isMedia(r)),
+    ).toBe(true);
+  });
+
+  it('an inaccessible file (403 on the probe) is not reported missing', async () => {
+    const a = await makeSyncHarness();
+    await addRun(a.db, A);
+    await uploaded(a, A);
+    const fileId = (await getRun(a.db, A))?.sync.drive?.file_id ?? '';
+    a.drive.fail({
+      when: (r) => r.method === 'GET' && r.path === `/drive/v3/files/${fileId}` && !isMedia(r),
+      status: 403,
+      reason: 'forbidden',
+      times: 10,
+    });
+    const report = await discoverAndReconcile(a.ctx);
+    expect(report.missing).toEqual([]);
+    expect((await getRun(a.db, A))?.sync.state).toBe('synced');
+  });
+
+  it('a transient probe failure (503) leaves the run synced, is counted as unverified, and does not fail the pass', async () => {
+    const a = await makeSyncHarness({ maxAttempts: 2 });
+    await addRun(a.db, A);
+    await uploaded(a, A);
+    const fileId = (await getRun(a.db, A))?.sync.drive?.file_id ?? '';
+    a.drive.fail({
+      when: (r) => r.method === 'GET' && r.path === `/drive/v3/files/${fileId}` && !isMedia(r),
+      status: 503,
+      times: 20,
+    });
+    const report = await discoverAndReconcile(a.ctx);
+    expect(report.unverified).toBe(1);
+    expect(report.missing).toEqual([]);
+    expect((await getRun(a.db, A))?.sync.state).toBe('synced');
+  });
+
+  it('a 401 on the probe ends the pass as unauthorized (account level), never as unverified', async () => {
+    const a = await makeSyncHarness();
+    await addRun(a.db, A);
+    await uploaded(a, A);
+    const fileId = (await getRun(a.db, A))?.sync.drive?.file_id ?? '';
+    a.drive.fail({
+      when: (r) => r.method === 'GET' && r.path === `/drive/v3/files/${fileId}` && !isMedia(r),
+      status: 401,
+    });
+    await expect(discoverAndReconcile(a.ctx)).rejects.toMatchObject({ kind: 'unauthorized' });
+    expect((await getRun(a.db, A))?.sync.state).toBe('synced');
+  });
+
+  it('cancellation between probes stops the pass with a cancelled error and changes no run', async () => {
+    const a = await makeSyncHarness();
+    await addRun(a.db, A);
+    await addRun(a.db, B, 'SYNTHETIC_non_ascii_names.csv');
+    await uploaded(a, A, B);
+    const controller = new AbortController();
+    let probes = 0;
+    const ctx = {
+      ...a.ctx,
+      signal: controller.signal,
+      client: {
+        ...a.ctx.client,
+        probeFile: (id: string, o?: { signal?: AbortSignal }) => {
+          probes += 1;
+          controller.abort();
+          return a.ctx.client.probeFile(id, o);
+        },
+      },
+    };
+    await expect(discoverAndReconcile(ctx)).rejects.toMatchObject({ kind: 'cancelled' });
+    expect(probes).toBe(1);
+    expect((await getRun(a.db, A))?.sync.state).toBe('synced');
+    expect((await getRun(a.db, B))?.sync.state).toBe('synced');
+  });
+
+  it('request growth: exactly one metadata probe per synced run, none for runs that are not synced', async () => {
+    const a = await makeSyncHarness();
+    await addRun(a.db, A);
+    await addRun(a.db, B, 'SYNTHETIC_non_ascii_names.csv');
+    await addRun(a.db, C, 'SYNTHETIC_blank_numerics.csv');
+    await uploaded(a, A, B);
+    const before = a.drive.requests.length;
+    await discoverAndReconcile(a.ctx);
+    const probes = a.drive.requests
+      .slice(before)
+      .filter(
+        (r) => r.method === 'GET' && /^\/drive\/v3\/files\/[^/]+$/.test(r.path) && !isMedia(r),
+      );
+    expect(probes).toHaveLength(2);
   });
 
   it('a run that never synced is unaffected, and a fresh device cannot detect a deletion it never saw', async () => {

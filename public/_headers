@@ -1,0 +1,27 @@
+# Cloudflare Pages response headers (also valid for Netlify). Not part of the offline shell:
+# build-sw.mjs ignores this file and the service worker never caches it. The page's own CSP is the
+# meta tag in index.html (exact policy pinned by scripts/csp-policy.mjs); the CSP header below
+# only ADDS frame-ancestors, which a meta tag cannot carry, so it cannot weaken the meta policy.
+# Validated by scripts/headers-policy.mjs (run by `npm run scan:dist`). No origin is named here.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Content-Security-Policy: frame-ancestors 'none'
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=()
+
+/
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache
+
+/sw.js
+  Cache-Control: no-cache
+
+/manifest.webmanifest
+  Cache-Control: no-cache
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

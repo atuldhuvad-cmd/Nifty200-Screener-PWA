@@ -37,7 +37,8 @@ function walk(dir) {
 export function listShellFiles(dir) {
   const files = walk(dir)
     .map((path) => relative(dir, path).split(sep).join('/'))
-    .filter((path) => path !== 'sw.js');
+    // `_headers` configures the host; it is not served to the browser and is never precached.
+    .filter((path) => path !== 'sw.js' && path !== '_headers');
   const unexpected = files.filter((path) => !SHELL_FILE.test(path));
   if (unexpected.length > 0) {
     throw new Error(`build-sw: unexpected file(s) in build output: ${unexpected.join(', ')}`);
