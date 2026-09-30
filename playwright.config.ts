@@ -15,6 +15,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   webServer: {
+    env: { VITE_GOOGLE_CLIENT_ID: 'n200-e2e-client.apps.googleusercontent.com' },
     command: `npm run build && npm run preview -- --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env['CI'],

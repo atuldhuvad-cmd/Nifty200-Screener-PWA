@@ -1,7 +1,7 @@
 # Nifty 200 Screener PWA: Decisions Record
 
 - **Date:** 2026-09-27
-- **Status:** pre-implementation decisions confirmed by the project owner. **Implementation is authorized only for the completed Steps 1–6, Step 6B, Step 7, Step 8 and Step 9 (see §5, §22, §23, §25 and §26).** Drive, OAuth, sync execution, the service worker, hosting, deployment and any later step still require separate, explicit authorization.
+- **Status:** pre-implementation decisions confirmed by the project owner. **Implementation is authorized only for the completed Steps 1–6, Step 6B, Step 7, Step 8, Step 9 and Step 10 (see §5, §22, §23, §25, §26 and §27).** Step 11, hosting, Cloudflare, a production origin, OAuth publishing, automatic or background sync, deletion, encryption, Android and any later step still require separate, explicit authorization.
 - **Governing brief:** `Nifty200_Screener_PWA_Brief_v8.md`, unchanged. The amendments in §3 take precedence over the brief where they conflict. The brief itself is not edited.
 - **Supporting evidence:** `INVESTIGATION_REPORT.md`
 
@@ -223,8 +223,9 @@ Still open:
 
 | Action | Authorized? |
 |---|---|
-| Implementation, scaffolding, package installs, git — Steps 1–6 (completed), Step 6B, Step 7 (local-first release hardening) and Step 8 (manifest, service worker and offline operation) and Step 9 (Drive sync engine core against a FAKE Drive only) only | **Yes** (updated 2026-09-30; see §22, §23, §25 and §26). Nothing beyond Step 9 is authorized. |
-| Drive, OAuth, sync execution, service worker, hosting, deployment, or any later step | **No.** Each needs its own explicit approval. |
+| Implementation, scaffolding, package installs, git — Steps 1–6 (completed), Step 6B, Step 7, Step 8, Step 9 (Drive sync engine core against a FAKE Drive) and Step 10 (localhost Google Drive connection and user-initiated sync, using the Step 9 engine) only | **Yes** (updated 2026-09-30; see §22, §23, §25, §26 and §27). Nothing beyond Step 10 is authorized. |
+| Step 11, hosting, deployment, a production origin, OAuth consent-screen publishing, automatic or background sync, deletion from Drive, encryption, Android, or any later step | **No.** Each needs its own explicit approval. |
+| First real Google contact | **Yes, only on `http://localhost` with a dedicated test Google account, through the owner's manual smoke test (§27).** Automated tests never contact Google. |
 | Google Cloud project / OAuth client creation | **No.** The owner performs this personally. |
 | Cloudflare account / project / deployment | **No** |
 | Access to `D:\Swing Trading` | **Never** |
@@ -1034,3 +1035,36 @@ Test and script changes only; no app behavior, schema, `DB_VERSION`, CSV grammar
 - **`remote_missing` recovery:** a saved file that reappears and validates as the same run moves the run out of `remote_missing` to `synced` (through the state machine) with refreshed version, checksum and folder, reported as `recovered`, with no re-upload. A `remote_missing` run is never treated as "unchanged" (a reappearing file may report the same version), and a reappearing file whose content diverged becomes a `remote` variant plus `conflict`, not `synced`.
 - **Lease renewal (implemented, so no follow-up is needed):** the client has an activity hook that runs before EVERY HTTP attempt (retries and each chunk or status query of a resumable upload included); `syncNow` sets it to renew the leader lease and clears it in `finally`. If a renewal finds the lease lost, the pass stops as cancelled (the run returns to its prior state) rather than racing the new leader. Test: with a 1 s lease and 600 ms per request, an interrupted multi-request upload runs far longer than one TTL while a contender tries to take the lease before every request and never succeeds.
 - **Fail-before / pass-after:** 16 of the 20 new tests failed before the changes (parent checks, folder recovery, recovery of `remote_missing`, lease renewal); all 20 pass. Mutation checks, each reverted and caught: no renewal hook; no self-heal on parent 404; discovery never checking the active folder (8 tests); no `remote_missing` recovery (2); the "unchanged" guard removed. Existing conflict, variant, 409, duplicate-folder and fresh-device-restore tests are unchanged and pass.
+
+---
+
+## 27. Step 10: localhost Google Drive connection and user-initiated sync (2026-09-30)
+
+**Authorization (this entry only):** Step 10 alone. **Still unauthorized:** hosting, Cloudflare, a production origin, OAuth publishing, Android, automatic or background sync, deletion, encryption, Step 11.
+
+**Design**
+
+- **Google Identity Services token model** (`src/core/sync/gisTokenProvider.ts`, `gisLoader.ts`). No refresh token, no client secret. The access token lives in memory only and is dropped on `reconnect_required` or `disconnected`. Scope is `https://www.googleapis.com/auth/drive.file` only; no email or profile scope. The script (`https://accounts.google.com/gsi/client`) is loaded only after the user clicks Connect; before that, nothing contacts Google.
+- **Client ID** comes from `VITE_GOOGLE_CLIENT_ID` (untracked `.env.local`). It is public configuration baked into the build and is not echoed in reports. The `scan:dist` client-ID pattern (`*.apps.googleusercontent.com`) is stripped before scanning. Playwright builds override it with a synthetic `n200-e2e-client` value. Without it (for example in CI) the Sync view says it is not configured and Connect is disabled.
+- **`#/sync` view** (`Sync.svelte`, `syncController.ts`, `syncMessages.ts`, `syncBrowser.ts`): Connect/Reconnect, Disconnect (revokes the token), Sync now (one sync at a time), status summary, account mismatch, folder-conflict chooser, `remote_missing` Restore-to-Drive / Keep-local-only, single-tab and Web-Locks warnings, and a readable-unencrypted-JSON notice.
+- **CSP** (meta tag, exact hosts): `script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style 'sha256-RU4sU0AaS8IBGZx8XrGt/pa9A5SLA3dQszGeqT5L3Kw='; connect-src 'self' https://www.googleapis.com https://accounts.google.com/gsi/ https://oauth2.googleapis.com/revoke; frame-src https://accounts.google.com/gsi/`. No `unsafe-inline`, `unsafe-hashes`, `unsafe-eval` or wildcard anywhere. Single source of truth: `scripts/csp-policy.mjs`.
+- **`scan:dist`** moved from a blanket Google-host ban to an explicit allowlist (`accounts.google.com`, `www.googleapis.com`, `oauth2.googleapis.com`) plus an exact-CSP check (`CSP_POLICY`). Any other Google-family host in the bundle fails the build.
+- **Service worker:** cross-origin requests are never intercepted or cached (tests added for the Google URLs).
+- **Isolation test rewritten:** the Step 9 "nothing imports the sync engine" test became "only the sync controller, its messages and its browser wiring import the engine; no file outside `src/core/sync` names a Google host."
+
+**Defect found by the browser tests:** `App.svelte` loaded the run list once, so after a sync or restore the Run history still showed `pending`. It now reloads on every route change.
+
+**Unchanged:** brief, `samples/`, CSV grammar, metrics, envelopes, backup format, database schema (`DB_VERSION` 3).
+
+**Evidence** (Node 24.20.0; Chromium 153.0.8010.12, Edge 154.0.4258.37, Playwright 1.63.0): unit 879 -> **981** (57 files). Playwright **180/180** across Chromium and Edge, including 17 new tests per browser in `tests/e2e/sync.spec.ts` against a local mock Google (`tests/e2e/mockGoogle.ts`, backed by the in-repo FakeDrive): lazy load, scope, connect, sync, fresh-device restore, conflict, both `remote_missing` actions, reconnect after 401, account mismatch, folder conflict, popup closed/blocked/denied, Disconnect revoke, Web Locks unavailable, keyboard-only flow, axe serious/critical clean in five states, zero CSP violations, and leak checks over IndexedDB, localStorage, sessionStorage, Cache Storage, console logs and a backup export (no token, upload session URL, email or Drive path). `npm run verify` passes; `npm audit` 0 vulnerabilities.
+
+**Manual smoke findings and CSP amendment (2026-09-30, owner-approved):** the owner's localhost smoke test with a dedicated test account found two CSP violations the mock could not reveal.
+- GIS inserts one inline style block. Chrome reported its hash, and the owner chose that exact hash in `style-src` over `unsafe-inline`. An interim `style-src-attr 'unsafe-inline'` attempt did not clear the violation (the block is an element, not an attribute) and was removed.
+- Disconnect calls `https://oauth2.googleapis.com/revoke`, which the policy blocked. `connect-src` now allows that one URL (not the whole host).
+- Tests: `csp.test.ts` pins the exact policy, allows exactly one `style-src` hash and no `unsafe-*`, and allows `oauth2.googleapis.com` only as `/revoke`. `scanDistServiceWorker.test.ts` rejects the whole OAuth host, another OAuth path, a different hash, `unsafe-inline` in place of the hash, a missing hash, and inline `style-src-elem`/`style-src-attr`. 12 of those tests failed against the previous policy and pass now (unit 981 -> 982). Playwright 180/180 again.
+- Also found: a first `accessNotConfigured` 403 was a Cloud project setup issue (Drive API not enabled in the client's project), not an app defect; the app reported it and changed nothing.
+- Risk: the hash is tied to Google's current inline CSS. If Google changes it, the style is blocked again (a cosmetic console error; sign-in was unaffected before the fix) and the hash needs updating, as a reviewed change.
+
+**Manual smoke result (2026-09-30, localhost, dedicated test account, stopped by owner decision):** PASS: 1 no Google traffic before Connect; 2 consent lists only "See, edit, create, and delete only the specific Google Drive files you use with this app" (`drive.file`, no email/profile); 3 Connected with no CSP errors (after the hash fix); 4 synthetic run uploaded, `synced`, file in Drive; 5 fresh-device restore in Edge with no duplicate; 7 missing-file detection, recovery from Drive's Trash, Restore to Drive and Keep local only; 10 Disconnect/revoke with no CSP errors (after the revoke-URL fix). Low findings, not blockers, recorded in `SMOKE_TEST_STEP10.md`: F1 summary does not count unchanged/skipped files; F2 stale summary after Restore to Drive; F3 Drive search can lag about a minute after trashing.
+
+**NOT TESTED:** manually: 6 conflict (covered by automated tests), 8 reconnect after revoke, 9 different account, 11 storage inspection, 12 keyboard/screen reader (8, 9, 11 and the keyboard part of 12 are covered by automated tests against the mock; no screen-reader pass). Also untested: quotas, 7-day test-mode token expiry, real-device and mobile browsers. Automated tests never contact Google.

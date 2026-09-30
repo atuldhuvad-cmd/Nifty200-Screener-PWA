@@ -23,11 +23,14 @@
     compareHash,
     isBackupRoute,
     isReviewRoute,
+    isSyncRoute,
     parseCompareRouteFromHash,
     parseRunIdFromHash,
     reviewHash,
+    syncHash,
   } from './lib/route';
   import StatusBar from './lib/StatusBar.svelte';
+  import Sync from './lib/Sync.svelte';
 
   type ImportMode = 'single' | 'multipart';
   let importMode = $state<ImportMode>('single');
@@ -48,6 +51,7 @@
   let onBackupRoute = $state(
     typeof location === 'undefined' ? false : isBackupRoute(location.hash),
   );
+  let onSyncRoute = $state(typeof location === 'undefined' ? false : isSyncRoute(location.hash));
   let onReviewRoute = $state(
     typeof location === 'undefined' ? false : isReviewRoute(location.hash),
   );
@@ -79,6 +83,9 @@
       compareRoute = parseCompareRouteFromHash(location.hash);
       onBackupRoute = isBackupRoute(location.hash);
       onReviewRoute = isReviewRoute(location.hash);
+      onSyncRoute = isSyncRoute(location.hash);
+      // A sync (or restore) changes stored runs while the user is on another view.
+      if (db) void refresh(db);
     };
     window.addEventListener('hashchange', onHashChange);
     return () => {
@@ -108,6 +115,7 @@
       <a href={compareHash()}>Compare stocks</a>
       <a href={backupHash()}>Backup</a>
       <a href={reviewHash()}>Needs review</a>
+      <a href={syncHash()}>Sync</a>
     </nav>
 
     {#if onBackupRoute}
@@ -117,6 +125,8 @@
           if (db) void refresh(db);
         }}
       />
+    {:else if onSyncRoute}
+      <Sync {db} />
     {:else if onReviewRoute}
       <Review
         {db}
