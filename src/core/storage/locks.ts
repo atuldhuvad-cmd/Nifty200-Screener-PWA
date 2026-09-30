@@ -62,6 +62,21 @@ export async function withActivity<T>(fn: () => Promise<T>): Promise<T> {
   return locks.request(ACTIVITY_LOCK_NAME, { mode: 'shared' }, () => fn());
 }
 
+/**
+ * Like `withActivity`, but for operations that must never run uncoordinated (Drive sync): the
+ * shared activity lock is required, and without Web Locks it fails closed with
+ * `WebLocksUnavailableError` before `fn` is ever called.
+ */
+export async function withRequiredActivity<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = getWebLocks();
+  if (locks === null) {
+    throw new WebLocksUnavailableError(
+      'Drive sync needs cross-tab coordination but Web Locks are unavailable. Use a single tab in a browser that supports Web Locks.',
+    );
+  }
+  return locks.request(ACTIVITY_LOCK_NAME, { mode: 'shared' }, () => fn());
+}
+
 export function isWebLocksAvailable(): boolean {
   return getWebLocks() !== null;
 }

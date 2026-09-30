@@ -23,6 +23,9 @@ const CONTENT_RULES = [
   ['PRIVATE_KEY', /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/],
   // Private research inputs must never ship: sample paths/names and real-looking ISINs.
   ['SAMPLE_REFERENCE', /samples[\\/]|Nifty200 All_|Nifty 200 with Fundamentals_/],
+  // No Google integration is authorized yet (Step 9 is a fake-Drive engine only): the shipped
+  // bundle must not name a Google host or load a Google script.
+  ['GOOGLE_HOSTNAME', /googleapis\.com|accounts\.google\.com|apis\.google\.com|gstatic\.com/],
   ['ISIN_DATA', /\bINE[0-9A-Z]{8}[0-9]\b/],
 ];
 

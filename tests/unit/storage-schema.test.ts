@@ -12,11 +12,17 @@ import { withMigrationLock } from '../../src/core/storage/locks';
 import { freshDbName } from '../storage-helpers';
 
 describe('openDatabase: schema creation', () => {
-  it('creates all four stores with the expected key paths and indexes', async () => {
+  it('creates all five stores with the expected key paths and indexes', async () => {
     const { db } = await openDatabase({ name: freshDbName() });
     try {
       expect(Array.from(db.objectStoreNames).sort()).toEqual(
-        [STORE.runs, STORE.runVariants, STORE.quarantineItems, STORE.comparisonIdentity].sort(),
+        [
+          STORE.runs,
+          STORE.runVariants,
+          STORE.quarantineItems,
+          STORE.comparisonIdentity,
+          STORE.syncProfile,
+        ].sort(),
       );
       expect(db.version).toBe(DB_VERSION);
 
@@ -55,7 +61,7 @@ describe('openDatabase: schema creation', () => {
     db1.close();
     const { db: db2 } = await openDatabase({ name });
     try {
-      expect(Array.from(db2.objectStoreNames)).toHaveLength(4);
+      expect(Array.from(db2.objectStoreNames)).toHaveLength(5);
     } finally {
       db2.close();
     }
@@ -219,7 +225,7 @@ describe('Bugbot P2-1: openDatabase surfaces usedLock and a single-active-tab wa
     const { db, singleTabWarning } = await withStubbedNavigator({}, () => openDatabase({ name }));
     try {
       expect(singleTabWarning).toBe(true);
-      expect(Array.from(db.objectStoreNames)).toHaveLength(4);
+      expect(Array.from(db.objectStoreNames)).toHaveLength(5);
     } finally {
       db.close();
     }
@@ -380,7 +386,7 @@ describe('Security review P2-A: fail closed on Web Locks unavailability for guar
     // afterward still goes through the normal fresh-install path, not a stale/broken one.
     const { db } = await openDatabase({ name });
     try {
-      expect(Array.from(db.objectStoreNames)).toHaveLength(4);
+      expect(Array.from(db.objectStoreNames)).toHaveLength(5);
     } finally {
       db.close();
     }
@@ -399,7 +405,7 @@ describe('Security review P2-A: fail closed on Web Locks unavailability for guar
     try {
       expect(usedLock).toBe(false);
       expect(singleTabWarning).toBe(true);
-      expect(Array.from(db.objectStoreNames)).toHaveLength(4);
+      expect(Array.from(db.objectStoreNames)).toHaveLength(5);
       await expect(db.getAll(STORE.runs)).resolves.toEqual([]);
     } finally {
       db.close();

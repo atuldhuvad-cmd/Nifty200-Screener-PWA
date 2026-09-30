@@ -61,30 +61,32 @@ test.describe('Step 7: cross-tab behaviour', () => {
     await other.goto('/');
     await expect(other.getByRole('navigation', { name: 'Main' })).toBeVisible();
 
-    // The second tab requests a NEWER schema version. The first tab's open connection receives
-    // `versionchange`; it must close, or this upgrade would block indefinitely.
-    const upgraded = await other.evaluate(
-      () =>
-        new Promise<string>((resolve) => {
-          const req = indexedDB.open('n200-screener', 3);
-          const timer = setTimeout(() => resolve('timed_out_blocked'), 8000);
-          req.onblocked = () => {
-            /* wait: the old tab should release its connection */
-          };
-          req.onupgradeneeded = () => {
-            /* no-op upgrade */
-          };
-          req.onsuccess = () => {
-            clearTimeout(timer);
-            req.result.close();
-            resolve('upgraded');
-          };
-          req.onerror = () => {
-            clearTimeout(timer);
-            resolve('error');
-          };
-        }),
-    );
+    // The second tab requests a NEWER schema version than the one currently installed (read from
+    // the browser, so this stays true whatever the app's current DB_VERSION is). The first tab's
+    // open connection receives `versionchange`; it must close, or this upgrade would block.
+    const upgraded = await other.evaluate(async () => {
+      const installed = (await indexedDB.databases()).find((d) => d.name === 'n200-screener');
+      const nextVersion = (installed?.version ?? 0) + 1;
+      return new Promise<string>((resolve) => {
+        const req = indexedDB.open('n200-screener', nextVersion);
+        const timer = setTimeout(() => resolve('timed_out_blocked'), 8000);
+        req.onblocked = () => {
+          /* wait: the old tab should release its connection */
+        };
+        req.onupgradeneeded = () => {
+          /* no-op upgrade */
+        };
+        req.onsuccess = () => {
+          clearTimeout(timer);
+          req.result.close();
+          resolve('upgraded');
+        };
+        req.onerror = () => {
+          clearTimeout(timer);
+          resolve('error');
+        };
+      });
+    });
     expect(upgraded).toBe('upgraded');
     await expect(page.getByRole('alert').filter({ hasText: 'Reload this page' })).toBeVisible();
   });

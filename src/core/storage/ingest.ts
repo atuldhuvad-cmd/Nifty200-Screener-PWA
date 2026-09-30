@@ -48,6 +48,21 @@ async function quarantine(
   return { kind: 'quarantined', quarantine_id, reasons };
 }
 
+/**
+ * Preserves untrusted envelope-level bytes in `quarantine_items` (never in `runs`), for callers
+ * that reject a candidate for a reason `ingestEnvelopeBytes` cannot see (e.g. Drive
+ * `appProperties` that disagree with the file's own content).
+ */
+export async function quarantineBytes(
+  db: N200Database,
+  bytes: Uint8Array,
+  source: QuarantineSource,
+  reasons: string[],
+  discoveryMetadata?: unknown,
+): Promise<IngestOutcome> {
+  return quarantine(db, bytes, source, reasons, discoveryMetadata);
+}
+
 function tryParseJson(bytes: Uint8Array): { ok: true; value: unknown } | { ok: false } {
   let text: string;
   try {
