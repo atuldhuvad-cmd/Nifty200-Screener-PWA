@@ -68,6 +68,15 @@ async function runSync(params: SyncParams): Promise<SyncReport> {
   const lease = await acquireSyncLease(db, { holderId, nowMs: now(), ttlMs });
   if (!lease.ok) return { status: 'busy' };
 
+  // Renew the lease before EVERY Drive request (retries and every chunk of a resumable upload
+  // included), so no upload can outlive it. If the lease was lost anyway, stop: another tab now
+  // leads, and continuing could race it.
+  client.setActivityHook(async () => {
+    if (!(await renewSyncLease(db, { holderId, nowMs: now(), ttlMs }))) {
+      throw new DriveError('cancelled', { reason: 'leaseLost' });
+    }
+  });
+
   try {
     const discovery = await discoverAndReconcile(ctx);
     const uploads: { runId: string; outcome: UploadOutcome }[] = [];
@@ -84,6 +93,7 @@ async function runSync(params: SyncParams): Promise<SyncReport> {
   } catch (error) {
     return mapFailure(error);
   } finally {
+    client.setActivityHook(null);
     await releaseSyncLease(db, holderId);
   }
 }

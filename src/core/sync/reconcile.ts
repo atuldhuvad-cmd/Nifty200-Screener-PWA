@@ -14,7 +14,7 @@ import { folderQuery, propertiesMatchEnvelope, runFileQuery } from './appPropert
 import type { DriveFile } from './driveClient';
 import { DriveError } from './errors';
 import { md5Hex } from './md5';
-import type { SyncContext } from './upload';
+import { checkActiveFolder, type ActiveFolderAction, type SyncContext } from './upload';
 
 /** A remote run file larger than this is not downloaded: it cannot be a valid run envelope. */
 const MAX_REMOTE_BYTES = 64 * 1024 * 1024;
@@ -25,6 +25,8 @@ export type FileResult =
   | 'linked'
   | 'already_present'
   | 'refreshed'
+  /** A `remote_missing` run whose saved file reappeared and validated: synced again. */
+  | 'recovered'
   | 'conflict'
   | 'quarantined'
   | 'unsupported_schema'
@@ -45,6 +47,8 @@ export interface DiscoveryReport {
   /** More than one app folder exists: surfaced for the user, never merged or resolved here. */
   folderConflict: boolean;
   files: FileOutcome[];
+  /** What was done about a saved active folder that discovery did not find. */
+  activeFolderAction: ActiveFolderAction;
   /** Run ids newly marked `remote_missing` by this pass. */
   missing: string[];
 }
@@ -90,8 +94,10 @@ async function reconcileFile(
   // either forces a full re-download and validation, whatever local state says.
   const known = runsByFileId.get(file.id);
   const drive = known?.sync.drive;
+  // (A `remote_missing` run is never "unchanged": its file coming back must be validated.)
   if (
     known !== undefined &&
+    known.sync.state !== 'remote_missing' &&
     drive?.version === (file.version ?? null) &&
     drive?.md5_checksum === (file.md5Checksum ?? null)
   ) {
@@ -136,6 +142,11 @@ async function reconcileFile(
       const linked = local?.sync.drive?.file_id;
       if (local === undefined) return outcome('already_present', ingested.run_id);
       if (linked === file.id) {
+        if (local.sync.state === 'remote_missing') {
+          // The saved file reappeared and its content validated as this very run.
+          await linkRemote(ctx, ingested.run_id, file, knownFolders);
+          return outcome('recovered', ingested.run_id);
+        }
         await setDriveMetadata(ctx.db, ingested.run_id, {
           version: file.version ?? null,
           md5_checksum: file.md5Checksum ?? null,
@@ -166,6 +177,10 @@ export async function discoverAndReconcile(ctx: SyncContext): Promise<DiscoveryR
   const signal = ctx.signal === undefined ? {} : { signal: ctx.signal };
 
   const folders = await ctx.client.listFiles({ q: folderQuery(), ...signal });
+  const activeFolderAction = await checkActiveFolder(
+    ctx,
+    folders.map((f) => f.id),
+  );
   const profile = await updateSyncProfile(ctx.db, (p) => {
     const onlyFolder = folders.length === 1 ? (folders[0]?.id ?? null) : null;
     const active = p.active_folder_id ?? onlyFolder;
@@ -205,5 +220,11 @@ export async function discoverAndReconcile(ctx: SyncContext): Promise<DiscoveryR
     }
   }
 
-  return { folders, folderConflict: folders.length > 1, files: outcomes, missing };
+  return {
+    folders,
+    folderConflict: folders.length > 1,
+    files: outcomes,
+    activeFolderAction,
+    missing,
+  };
 }

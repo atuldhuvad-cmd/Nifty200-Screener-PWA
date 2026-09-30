@@ -93,6 +93,8 @@ interface Session {
 export class FakeDrive {
   readonly files = new Map<string, FakeFile>();
   readonly requests: RecordedRequest[] = [];
+  /** Files the account can no longer access (Drive answers 403 appNotAuthorizedToFile). */
+  readonly inaccessibleIds = new Set<string>();
   permissionId = FAKE_PERMISSION_ID;
   /** Corrupt the stored bytes of the next N completed uploads (simulates a bad transfer). */
   corruptNextUploads = 0;
@@ -190,6 +192,22 @@ export class FakeDrive {
 
   requestsMatching(predicate: (r: RecordedRequest) => boolean): RecordedRequest[] {
     return this.requests.filter(predicate);
+  }
+
+  /** Real Drive refuses to create a file under a parent that is missing, trashed, not a
+   * folder, or not accessible to the app. */
+  private parentProblem(parents: string[] | undefined): Response | null {
+    for (const id of parents ?? []) {
+      if (this.inaccessibleIds.has(id)) {
+        return errorResponse(403, 'appNotAuthorizedToFile', 'The app cannot access the parent');
+      }
+      const parent = this.files.get(id);
+      if (!parent || parent.trashed) return errorResponse(404, 'notFound', `File not found: ${id}`);
+      if (parent.mimeType !== MIME_FOLDER) {
+        return errorResponse(400, 'badRequest', 'The parent is not a folder');
+      }
+    }
+    return null;
   }
 
   private mustGet(id: string): FakeFile {
@@ -362,6 +380,7 @@ export class FakeDrive {
     const notTrashed = /trashed\s*=\s*false/.test(rest);
     const parent = /'([^']+)' in parents/.exec(rest)?.[1];
     return [...this.files.values()].filter((f) => {
+      if (this.inaccessibleIds.has(f.id)) return false; // never listed to an app that cannot access it
       if (mime !== undefined && f.mimeType !== mime) return false;
       if (notTrashed && f.trashed) return false;
       if (parent !== undefined && !f.parents.includes(parent)) return false;
@@ -370,6 +389,9 @@ export class FakeDrive {
   }
 
   private getFile(id: string, url: URL): Response {
+    if (this.inaccessibleIds.has(id)) {
+      return errorResponse(403, 'appNotAuthorizedToFile', 'The app cannot access this file');
+    }
     const file = this.files.get(id);
     if (!file) return errorResponse(404, 'notFound', 'File not found');
     if (url.searchParams.get('alt') === 'media') {
@@ -402,6 +424,8 @@ export class FakeDrive {
     if (body.id !== undefined && this.files.has(body.id)) {
       return errorResponse(409, 'duplicate', 'A file with that ID already exists');
     }
+    const parentIssue = this.parentProblem(body.parents);
+    if (parentIssue) return parentIssue;
     const file = this.addFile({
       ...(body.id !== undefined ? { id: body.id } : {}),
       name: body.name ?? 'untitled',
@@ -420,6 +444,8 @@ export class FakeDrive {
     if (metadata.id !== undefined && this.files.has(metadata.id)) {
       return errorResponse(409, 'duplicate', 'A file with that ID already exists');
     }
+    const parentIssue = this.parentProblem(metadata.parents);
+    if (parentIssue) return parentIssue;
     const id = randomUUID();
     this.sessions.set(id, {
       id,
@@ -480,6 +506,8 @@ export class FakeDrive {
     const existing =
       session.metadata.id !== undefined ? this.files.get(session.metadata.id) : undefined;
     if (existing) return jsonResponse(200, this.resource(existing));
+    const parentIssue = this.parentProblem(session.metadata.parents);
+    if (parentIssue) return parentIssue;
     const file = this.addFile({
       ...(session.metadata.id !== undefined ? { id: session.metadata.id } : {}),
       name: session.metadata.name,

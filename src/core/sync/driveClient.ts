@@ -82,6 +82,12 @@ export interface DriveClient {
     sessionKey: string;
     signal?: AbortSignal;
   }): Promise<DriveFile>;
+  /**
+   * Runs before EVERY HTTP attempt (retries included) for as long as it is set. The sync engine
+   * uses it to renew its leader lease, so a long upload can never outlive the lease. A hook that
+   * throws aborts the request.
+   */
+  setActivityHook(hook: (() => Promise<void>) | null): void;
   /** Resumable session URLs live only here, in memory (never persisted). */
   hasSession(sessionKey: string): boolean;
   discardSession(sessionKey: string): void;
@@ -122,6 +128,7 @@ export function createDriveClient(options: DriveClientOptions): DriveClient {
     options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const random = options.random ?? Math.random;
   const sessions = new Map<string, string>();
+  let activityHook: (() => Promise<void>) | null = null;
 
   function backoffMs(attempt: number, error: DriveError): number {
     if (error.retryAfterMs !== null) return Math.min(maxDelayMs, error.retryAfterMs);
@@ -131,6 +138,7 @@ export function createDriveClient(options: DriveClientOptions): DriveClient {
 
   async function attemptOnce(spec: RequestSpec): Promise<Response> {
     if (spec.signal?.aborted === true) throw new DriveError('cancelled');
+    if (activityHook !== null) await activityHook();
 
     const headers: Record<string, string> = { ...(spec.headers ?? {}) };
     if (spec.authenticated !== false) {
@@ -451,6 +459,9 @@ export function createDriveClient(options: DriveClientOptions): DriveClient {
         ...signalOf(o),
       }),
     uploadFileResumable,
+    setActivityHook(hook) {
+      activityHook = hook;
+    },
     hasSession: (key) => sessions.has(key),
     discardSession(key) {
       sessions.delete(key);

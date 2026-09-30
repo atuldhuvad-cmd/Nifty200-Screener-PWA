@@ -11,7 +11,13 @@ import {
   updateSyncProfile,
   type N200Database,
 } from '../storage';
-import { runProperties, folderProperties, folderQuery, FOLDER_NAME } from './appProperties';
+import {
+  FOLDER_MIME,
+  FOLDER_NAME,
+  folderProperties,
+  folderQuery,
+  runProperties,
+} from './appProperties';
 import type { DriveClient, DriveFile } from './driveClient';
 import { DriveError } from './errors';
 import { md5Hex } from './md5';
@@ -130,6 +136,42 @@ export async function ensureAppFolder(ctx: SyncContext): Promise<FolderResult> {
   return { kind: 'ready', folderId };
 }
 
+export type ActiveFolderAction = 'none' | 'readopted' | 'cleared';
+
+/**
+ * Verifies that the saved active folder still exists. `discovered` are the tagged folder IDs a
+ * search just returned (an active folder among them is fine). Otherwise the folder is probed
+ * directly: one that still exists as a live folder (say it lost its tags) is kept and re-adopted;
+ * one that is trashed, permanently gone or no longer accessible is cleared, together with its
+ * entry in the known-folder list, so the next pass adopts a single valid folder, surfaces several
+ * as a conflict, or creates a fresh one. Never deletes, moves or merges anything on Drive.
+ */
+export async function checkActiveFolder(
+  ctx: SyncContext,
+  discovered: readonly string[],
+): Promise<ActiveFolderAction> {
+  const signal = ctx.signal === undefined ? {} : { signal: ctx.signal };
+  const profile = await ensureSyncProfile(ctx.db);
+  const active = profile.active_folder_id;
+  if (active === null || discovered.includes(active)) return 'none';
+
+  const probe = await ctx.client.probeFile(active, signal);
+  const alive = probe.state === 'present' && probe.file?.mimeType === FOLDER_MIME;
+  await updateSyncProfile(ctx.db, (p) => {
+    if (p.active_folder_id !== active) return p; // changed by someone else meanwhile: leave it
+    if (alive) {
+      return { ...p, known_folder_ids: [...new Set([...p.known_folder_ids, active])] };
+    }
+    return {
+      ...p,
+      active_folder_id: null,
+      known_folder_ids: p.known_folder_ids.filter((id) => id !== active),
+      pending_folder_id: p.pending_folder_id === active ? null : p.pending_folder_id,
+    };
+  });
+  return alive ? 'readopted' : 'cleared';
+}
+
 /** The user's explicit choice of upload destination when several app folders exist. */
 export async function selectActiveFolder(db: N200Database, folderId: string): Promise<void> {
   await updateSyncProfile(db, (p) => ({
@@ -220,7 +262,7 @@ async function transfer(ctx: SyncContext, run: RunRecord): Promise<Attempt> {
   if (!isSupportedEnvelope(run.envelope)) throw new DriveError('protocol');
   const envelope = run.envelope;
 
-  const folder = await ensureAppFolder(ctx);
+  let folder = await ensureAppFolder(ctx);
   if (folder.kind === 'conflict') return { kind: 'blocked', reason: 'FOLDER_CONFLICT' };
 
   const fileId = await ensureDriveFileId(ctx.db, run.run_id, async () => {
@@ -231,17 +273,32 @@ async function transfer(ctx: SyncContext, run: RunRecord): Promise<Attempt> {
 
   const bytes = serializeEnvelope(envelope);
   const localMd5 = md5Hex(bytes);
-  let file: DriveFile;
-  try {
-    file = await ctx.client.uploadFileResumable({
+  const startUpload = (parent: string): Promise<DriveFile> =>
+    ctx.client.uploadFileResumable({
       id: fileId,
       name: `run-${run.run_id}.json`,
-      parents: [folder.folderId],
+      parents: [parent],
       appProperties: runProperties(envelope),
       bytes,
       sessionKey: `run:${run.run_id}`,
       ...signal,
     });
+
+  let file: DriveFile;
+  try {
+    try {
+      file = await startUpload(folder.folderId);
+    } catch (error) {
+      // A 404 while uploading means the parent is gone. If the saved active folder no longer
+      // exists, clear it, get (adopt or create) a valid one, and try once more, instead of
+      // failing this run with a permanent not-found.
+      if (!(error instanceof DriveError) || error.kind !== 'not_found') throw error;
+      ctx.client.discardSession(`run:${run.run_id}`);
+      if ((await checkActiveFolder(ctx, [])) !== 'cleared') throw error;
+      folder = await ensureAppFolder(ctx);
+      if (folder.kind === 'conflict') return { kind: 'blocked', reason: 'FOLDER_CONFLICT' };
+      file = await startUpload(folder.folderId);
+    }
   } catch (error) {
     if (!(error instanceof DriveError) || error.kind !== 'conflict') throw error;
     // The pre-generated ID already exists remotely. Never upload again under a new ID:
