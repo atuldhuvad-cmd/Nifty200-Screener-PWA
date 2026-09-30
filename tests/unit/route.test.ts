@@ -101,3 +101,13 @@ describe('Step 6B review route', () => {
       expect(isReviewRoute(h)).toBe(false);
   });
 });
+
+describe('Step 10 sync route', () => {
+  it('syncHash / isSyncRoute round-trip and never match other routes', async () => {
+    const { syncHash, isSyncRoute } = await import('../../src/lib/route');
+    expect(syncHash()).toBe('#/sync');
+    expect(isSyncRoute('#/sync')).toBe(true);
+    for (const h of ['', '#/', '#/backup', '#/review', '#/sync/x', '#/syncing', '#/compare'])
+      expect(isSyncRoute(h)).toBe(false);
+  });
+});

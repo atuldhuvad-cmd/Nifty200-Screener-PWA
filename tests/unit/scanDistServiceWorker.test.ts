@@ -5,6 +5,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { buildServiceWorker } from '../../scripts/build-sw.mjs';
 import { scanDist } from '../../scripts/scan-dist.mjs';
 
+const APPROVED_CSP_CONTENT =
+  "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; object-src 'none'; base-uri 'self'; form-action 'self'";
+
 const dirs: string[] = [];
 const MANIFEST = JSON.stringify({
   name: 'Nifty 200 Screener',
@@ -18,7 +21,7 @@ const MANIFEST = JSON.stringify({
   ],
 });
 const SHELL: Record<string, string> = {
-  'index.html': '<!doctype html><script type="module" src="/assets/index-aaa.js"></script>',
+  'index.html': `<!doctype html><meta http-equiv="Content-Security-Policy" content="${APPROVED_CSP_CONTENT}"><script type="module" src="/assets/index-aaa.js"></script>`,
   'manifest.webmanifest': MANIFEST,
   'icons/icon-192.png': 'png192',
   'icons/icon-512.png': 'png512',
@@ -128,16 +131,60 @@ describe('scanDist: service worker and manifest', () => {
 
   it.each([
     ['the Drive API host', 'fetch("https://www.googleapis.com/drive/v3/files")'],
-    ['the Google sign-in host', 'load("https://accounts.google.com/gsi/client")'],
+    ['the Google sign-in script host', 'load("https://accounts.google.com/gsi/client")'],
+    ['an OAuth client ID', 'const id = "1234567890-abcdefghijk.apps.googleusercontent.com";'],
+    ['a test client ID', 'const id = "n200-test-client.apps.googleusercontent.com";'],
+  ])('allows %s in the production bundle (approved for Step 10)', (_n, code) => {
+    const dir = makeBuiltDist({ 'assets/index-aaa.js': code });
+    expect(rules(dir)).not.toContain('GOOGLE_HOSTNAME');
+  });
+
+  it.each([
     ['the Google API loader', 'load("https://apis.google.com/js/api.js")'],
     ['a Google static host', 'src="https://www.gstatic.com/x.js"'],
-  ])(
-    'fails when the production bundle names %s (no Google integration is authorized yet)',
-    (_n, code) => {
-      const dir = makeBuiltDist({ 'assets/index-aaa.js': code });
-      expect(rules(dir)).toContain('GOOGLE_HOSTNAME');
-    },
-  );
+    ['the OAuth token host', 'fetch("https://oauth2.googleapis.com/revoke")'],
+    ['another googleapis host', 'fetch("https://drive.googleapis.com/x")'],
+    ['a Google user-content host', 'img("https://lh3.googleusercontent.com/a")'],
+    ['www.google.com', 'fetch("https://www.google.com/x")'],
+  ])('fails when the production bundle names %s (not approved)', (_n, code) => {
+    const dir = makeBuiltDist({ 'assets/index-aaa.js': code });
+    expect(rules(dir)).toContain('GOOGLE_HOSTNAME');
+  });
+
+  it('passes the approved page CSP and fails any change to it', () => {
+    expect(rules(makeBuiltDist())).not.toContain('CSP_POLICY');
+    const bad = (csp: string): string[] =>
+      rules(
+        makeBuiltDist({
+          'index.html': `<!doctype html><meta http-equiv="Content-Security-Policy" content="${csp}">`,
+        }),
+      );
+    expect(
+      bad(
+        APPROVED_CSP_CONTENT.replace(
+          "'self' https://accounts.google.com/gsi/client",
+          "'self' https://apis.google.com",
+        ),
+      ),
+    ).toContain('CSP_POLICY');
+    expect(bad(APPROVED_CSP_CONTENT + "; script-src-elem 'unsafe-inline'")).toContain('CSP_POLICY');
+    expect(bad(APPROVED_CSP_CONTENT.replace("connect-src 'self'", 'connect-src *'))).toContain(
+      'CSP_POLICY',
+    );
+    expect(
+      bad(
+        APPROVED_CSP_CONTENT.replace(
+          'https://www.googleapis.com',
+          'https://www.googleapis.com https://oauth2.googleapis.com',
+        ),
+      ),
+    ).toContain('CSP_POLICY');
+  });
+
+  it('fails a build whose index.html has no CSP at all', () => {
+    const dir = makeBuiltDist({ 'index.html': '<!doctype html><title>x</title>' });
+    expect(rules(dir)).toContain('CSP_POLICY');
+  });
 
   it('does not run text rules over PNG icons', () => {
     const dir = makeBuiltDist({ 'icons/icon-192.png': 'binary INE324D01010 payload' });

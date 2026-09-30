@@ -9,6 +9,7 @@ import { join, relative, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import { SHELL_FILE } from './build-sw.mjs';
+import { APPROVED_GOOGLE_HOSTS, pageCspIsApproved } from './csp-policy.mjs';
 
 /** Content rules: [rule id, pattern]. Deliberately specific to keep false positives near zero. */
 /** @type {[string, RegExp][]} */
@@ -23,9 +24,6 @@ const CONTENT_RULES = [
   ['PRIVATE_KEY', /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/],
   // Private research inputs must never ship: sample paths/names and real-looking ISINs.
   ['SAMPLE_REFERENCE', /samples[\\/]|Nifty200 All_|Nifty 200 with Fundamentals_/],
-  // No Google integration is authorized yet (Step 9 is a fake-Drive engine only): the shipped
-  // bundle must not name a Google host or load a Google script.
-  ['GOOGLE_HOSTNAME', /googleapis\.com|accounts\.google\.com|apis\.google\.com|gstatic\.com/],
   ['ISIN_DATA', /\bINE[0-9A-Z]{8}[0-9]\b/],
 ];
 
@@ -139,6 +137,21 @@ function scanServiceWorker(dir, files, required) {
   return findings;
 }
 
+/** Any Google hostname; each one found must be on the approved list (see csp-policy.mjs). */
+const GOOGLE_HOST_PATTERN =
+  /\b(?:[a-z0-9-]+\.)*(?:googleapis|google|gstatic|googleusercontent|googleadservices)\.com\b/gi;
+/** OAuth client IDs embed `apps.googleusercontent.com`; they are public configuration, not hosts. */
+const CLIENT_ID_PATTERN = /[A-Za-z0-9_-]+\.apps\.googleusercontent\.com/g;
+
+/**
+ * @param {string} text
+ * @returns {boolean} whether the text names a Google host that is not approved
+ */
+function namesUnapprovedGoogleHost(text) {
+  const hosts = text.replace(CLIENT_ID_PATTERN, '').match(GOOGLE_HOST_PATTERN) ?? [];
+  return hosts.some((host) => !APPROVED_GOOGLE_HOSTS.includes(host.toLowerCase()));
+}
+
 /**
  * @param {string} dir
  * @param {{ requireServiceWorker?: boolean }} [options]
@@ -163,8 +176,16 @@ export function scanDist(dir, options = {}) {
     for (const [rule, pattern] of CONTENT_RULES) {
       if (pattern.test(text)) findings.push({ rule, file });
     }
+    if (namesUnapprovedGoogleHost(text)) findings.push({ rule: 'GOOGLE_HOSTNAME', file });
   }
   findings.push(...scanServiceWorker(dir, files, options.requireServiceWorker === true));
+  if (options.requireServiceWorker === true) {
+    // Production mode: the page must ship exactly the approved CSP.
+    const indexPath = join(dir, 'index.html');
+    if (!existsSync(indexPath) || !pageCspIsApproved(readFileSync(indexPath, 'utf8'))) {
+      findings.push({ rule: 'CSP_POLICY', file: 'index.html' });
+    }
+  }
   return findings;
 }
 

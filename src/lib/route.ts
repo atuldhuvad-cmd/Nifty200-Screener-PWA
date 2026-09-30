@@ -65,6 +65,15 @@ export function isBackupRoute(hash: string): boolean {
   return hash === '#/backup';
 }
 
+/** Step 10: the Google Drive sync view. A plain, static route. */
+export function syncHash(): string {
+  return '#/sync';
+}
+
+export function isSyncRoute(hash: string): boolean {
+  return hash === '#/sync';
+}
+
 /** Step 6B: the conflict/quarantine review view. A plain, static route. */
 export function reviewHash(): string {
   return '#/review';
