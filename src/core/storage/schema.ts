@@ -18,6 +18,7 @@ import type {
   QuarantineItemRecord,
   RunRecord,
   RunVariantRecord,
+  SyncProfileRecord,
 } from './types';
 
 export const DB_NAME = 'n200-screener';
@@ -27,13 +28,14 @@ export const DB_NAME = 'n200-screener';
  * `has_verified_remote_copy`. v2 (security review P1-B) adds all three, migrated in place for
  * any existing v1 database — see `upgrade()` below.
  */
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 export const STORE = {
   runs: 'runs',
   runVariants: 'run_variants',
   quarantineItems: 'quarantine_items',
   comparisonIdentity: 'comparison_identity',
+  syncProfile: 'sync_profile',
 } as const;
 
 export const RUNS_BY_ORIGINAL_FILE_SHA256 = 'by_original_file_sha256';
@@ -42,6 +44,10 @@ export const COMPARISON_BY_IDENTITY_KEY = 'by_identity_key';
 export const COMPARISON_BY_NORMALIZED_NSE_CODE = 'by_normalized_nse_code';
 
 export interface N200DBSchema extends DBSchema {
+  [STORE.syncProfile]: {
+    key: string; // profile_id
+    value: SyncProfileRecord;
+  };
   [STORE.runs]: {
     key: string; // run_id
     value: RunRecord;
@@ -234,11 +240,18 @@ export async function openDatabase(options: OpenDatabaseOptions = {}): Promise<O
           comparison.createIndex(COMPARISON_BY_RUN_ID, 'run_id');
           comparison.createIndex(COMPARISON_BY_IDENTITY_KEY, 'identity_key');
           comparison.createIndex(COMPARISON_BY_NORMALIZED_NSE_CODE, 'normalized_nse_code');
+
+          database.createObjectStore(STORE.syncProfile, { keyPath: 'profile_id' });
           return;
         }
 
         if (oldVersion < 2) {
           await migrateV1ToV2(transaction);
+        }
+
+        if (oldVersion < 3) {
+          // v2 -> v3: one new, empty store. No existing record is read or rewritten.
+          database.createObjectStore(STORE.syncProfile, { keyPath: 'profile_id' });
         }
       },
       ...handlers,

@@ -161,7 +161,13 @@ export function transition(current: SyncRecord, event: SyncEvent): TransitionRes
 
   return {
     ok: true,
-    record: { state: nextState, prior_stable_state: priorStableState, diagnostics },
+    record: {
+      state: nextState,
+      prior_stable_state: priorStableState,
+      diagnostics,
+      // Drive bookkeeping is not part of the state machine, but it must survive every transition.
+      ...(current.drive !== undefined ? { drive: current.drive } : {}),
+    },
   };
 }
 

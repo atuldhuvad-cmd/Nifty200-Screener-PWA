@@ -33,8 +33,23 @@ export interface SyncDiagnostics {
   has_verified_remote_copy: boolean;
 }
 
+/**
+ * Device-specific Drive bookkeeping for one run. It lives on the run's sync record (never in the
+ * immutable envelope, never in a backup), and holds no token, no session URL and no email.
+ */
+export interface DriveMetadata {
+  /** The pre-generated Drive file ID, persisted BEFORE the first upload attempt. */
+  file_id: string;
+  folder_id: string | null;
+  /** Drive's `version` and `md5Checksum` as of the last verified upload or download. */
+  version: string | null;
+  md5_checksum: string | null;
+}
+
 export interface SyncRecord {
   state: SyncState;
+  /** Absent until the run has been assigned a Drive file ID. */
+  drive?: DriveMetadata;
   /**
    * The state to fall back to if the current `syncing` attempt is cancelled or times out
    * ("A user cancellation restores the run to its previous stable state" — the brief's two
@@ -74,6 +89,28 @@ export interface RunRecord {
   run_id: string;
   envelope: RunEnvelopeV1 | RunEnvelopeV2 | UnsupportedSchemaEnvelope;
   sync: SyncRecord;
+}
+
+/** A single-leader lease so only one tab drains the sync queue (no nested Web Locks). */
+export interface SyncLease {
+  holder_id: string;
+  expires_at_ms: number;
+}
+
+/**
+ * The one sync profile for this device. Holds only the opaque Drive `permissionId` the profile
+ * is bound to, folder identifiers, and the leader lease. Never an email, token or session URL.
+ */
+export interface SyncProfileRecord {
+  profile_id: 'default';
+  bound_permission_id: string | null;
+  active_folder_id: string | null;
+  known_folder_ids: string[];
+  /** A pre-generated folder ID, persisted before the folder is first created. */
+  pending_folder_id: string | null;
+  lease: SyncLease | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type VariantSource = 'remote' | 'backup_import' | 'manual_recovery';

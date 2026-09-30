@@ -126,6 +126,19 @@ describe('scanDist: service worker and manifest', () => {
     );
   });
 
+  it.each([
+    ['the Drive API host', 'fetch("https://www.googleapis.com/drive/v3/files")'],
+    ['the Google sign-in host', 'load("https://accounts.google.com/gsi/client")'],
+    ['the Google API loader', 'load("https://apis.google.com/js/api.js")'],
+    ['a Google static host', 'src="https://www.gstatic.com/x.js"'],
+  ])(
+    'fails when the production bundle names %s (no Google integration is authorized yet)',
+    (_n, code) => {
+      const dir = makeBuiltDist({ 'assets/index-aaa.js': code });
+      expect(rules(dir)).toContain('GOOGLE_HOSTNAME');
+    },
+  );
+
   it('does not run text rules over PNG icons', () => {
     const dir = makeBuiltDist({ 'icons/icon-192.png': 'binary INE324D01010 payload' });
     expect(rules(dir)).toEqual([]);

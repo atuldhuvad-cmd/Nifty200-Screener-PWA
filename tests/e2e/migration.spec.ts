@@ -84,7 +84,9 @@ async function seedV1Database(
   );
 }
 
-test('7. a real v1-shaped IndexedDB database upgrades to v2 on load', async ({ page }) => {
+test('7. a real v1-shaped IndexedDB database upgrades to the current schema on load', async ({
+  page,
+}) => {
   const syncedEnvelope = await buildTestEnvelope({
     runId: '11111111-1111-4111-8111-111111111111',
     effectiveDate: '2026-01-01',

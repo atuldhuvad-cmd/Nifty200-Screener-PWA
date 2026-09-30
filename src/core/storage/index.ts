@@ -12,7 +12,12 @@ export type {
   IdentityConflictGroup,
 } from './comparisonIndex';
 export type { IngestOutcome, ParsedCandidate, RoutingDecision } from './ingest';
-export { decideRouting, ingestEnvelopeBytes, parseIngestCandidate } from './ingest';
+export {
+  decideRouting,
+  ingestEnvelopeBytes,
+  parseIngestCandidate,
+  quarantineBytes,
+} from './ingest';
 export { REDACTED, sanitizeQuarantineDiscoveryMetadata } from './sanitizeDiscoveryMetadata';
 export {
   ACTIVITY_LOCK_NAME,
@@ -21,6 +26,7 @@ export {
   WebLocksUnavailableError,
   withActivity,
   withMigrationLock,
+  withRequiredActivity,
   withRequiredLock,
 } from './locks';
 export type { LockOutcome } from './locks';
@@ -58,6 +64,9 @@ export { SYNC_STATES, transition } from './syncState';
 export type { SyncEvent, SyncEventType, TransitionResult } from './syncState';
 export { initialSyncRecord, QUARANTINE_DETECTION_CONTEXTS } from './types';
 export type {
+  DriveMetadata,
+  SyncLease,
+  SyncProfileRecord,
   ComparisonIdentityRecord,
   QuarantineDetectionContext,
   QuarantineDiscoveryMetadata,
@@ -71,3 +80,14 @@ export type {
   UnsupportedSchemaEnvelope,
   VariantSource,
 } from './types';
+export { ensureDriveFileId, replaceDriveFileId, setDriveMetadata } from './driveMetadata';
+export {
+  acquireSyncLease,
+  bindPermission,
+  ensureSyncProfile,
+  getSyncProfile,
+  releaseSyncLease,
+  renewSyncLease,
+  updateSyncProfile,
+} from './syncProfile';
+export type { BindResult, LeaseResult } from './syncProfile';

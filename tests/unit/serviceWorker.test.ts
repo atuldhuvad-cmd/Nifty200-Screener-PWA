@@ -288,6 +288,15 @@ describe('service worker: fetch allowlist', () => {
     ['a backup export path', () => get('/n200-backup-v1-2026.json')],
     ['a CSV path', () => get('/samples/export.csv')],
     ['an unrelated app path', () => get('/api/drive/files')],
+    ['the Drive API', () => new Request('https://www.googleapis.com/drive/v3/files?fields=id')],
+    [
+      'a Drive resumable session URL',
+      () =>
+        new Request(
+          'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=x',
+        ),
+    ],
+    ['the Google sign-in script', () => new Request('https://accounts.google.com/gsi/client')],
   ])('does not intercept %s', async (_n, make) => {
     const world = await installed();
     expect((await world.fetchEvent(make())).intercepted).toBe(false);
