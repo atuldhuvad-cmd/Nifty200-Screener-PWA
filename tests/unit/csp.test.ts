@@ -22,9 +22,19 @@ function directives(csp: string): Record<string, string[]> {
 const EXPECTED: Record<string, string[]> = {
   'default-src': ["'self'"],
   'script-src': ["'self'", 'https://accounts.google.com/gsi/client'],
-  'style-src': ["'self'", 'https://accounts.google.com/gsi/style'],
+  // The hash allows exactly one inline style block that Google's sign-in script inserts.
+  'style-src': [
+    "'self'",
+    'https://accounts.google.com/gsi/style',
+    "'sha256-RU4sU0AaS8IBGZx8XrGt/pa9A5SLA3dQszGeqT5L3Kw='",
+  ],
   'img-src': ["'self'", 'data:'],
-  'connect-src': ["'self'", 'https://www.googleapis.com', 'https://accounts.google.com/gsi/'],
+  'connect-src': [
+    "'self'",
+    'https://www.googleapis.com',
+    'https://accounts.google.com/gsi/',
+    'https://oauth2.googleapis.com/revoke',
+  ],
   'frame-src': ['https://accounts.google.com/gsi/'],
   'object-src': ["'none'"],
   'base-uri': ["'self'"],
@@ -38,7 +48,16 @@ describe('the page CSP (Step 10): loosened only for the exact Google hosts neede
     expect(csp).toEqual(EXPECTED);
   });
 
-  it('never allows wildcards, inline or eval, or any unapproved Google host', () => {
+  it('allows no unsafe-inline or unsafe-hashes anywhere; inline is limited to one style hash', () => {
+    expect(JSON.stringify(csp)).not.toMatch(/unsafe-(inline|eval|hashes)/);
+    const hashes = Object.entries(csp).flatMap(([name, sources]) =>
+      sources.filter((x) => x.startsWith("'sha")).map((x) => `${name} ${x}`),
+    );
+    expect(hashes).toEqual(["style-src 'sha256-RU4sU0AaS8IBGZx8XrGt/pa9A5SLA3dQszGeqT5L3Kw='"]);
+    expect(csp['script-src']?.some((x) => x.startsWith("'sha"))).toBe(false);
+  });
+
+  it('never allows wildcards, eval, or any unapproved Google host', () => {
     const all = Object.values(csp).flat();
     for (const source of all) {
       expect(source).not.toBe('*');
@@ -51,6 +70,7 @@ describe('the page CSP (Step 10): loosened only for the exact Google hosts neede
       'https://accounts.google.com/gsi/style',
       'https://accounts.google.com/gsi/',
       'https://www.googleapis.com',
+      'https://oauth2.googleapis.com/revoke',
     ]);
     for (const host of hosts) expect(allowed.has(host)).toBe(true);
   });
@@ -59,7 +79,10 @@ describe('the page CSP (Step 10): loosened only for the exact Google hosts neede
     expect(csp['script-src']).toEqual(["'self'", 'https://accounts.google.com/gsi/client']);
   });
 
-  it('does not open connect-src to the OAuth token or revoke hosts (not proven needed)', () => {
-    expect(JSON.stringify(csp)).not.toContain('oauth2.googleapis.com');
+  it('opens the OAuth host only for the one revoke URL, not the whole host', () => {
+    const oauth = Object.values(csp)
+      .flat()
+      .filter((x) => x.includes('oauth2.googleapis.com'));
+    expect(oauth).toEqual(['https://oauth2.googleapis.com/revoke']);
   });
 });

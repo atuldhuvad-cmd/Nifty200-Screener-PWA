@@ -6,7 +6,7 @@ import { buildServiceWorker } from '../../scripts/build-sw.mjs';
 import { scanDist } from '../../scripts/scan-dist.mjs';
 
 const APPROVED_CSP_CONTENT =
-  "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; object-src 'none'; base-uri 'self'; form-action 'self'";
+  "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style 'sha256-RU4sU0AaS8IBGZx8XrGt/pa9A5SLA3dQszGeqT5L3Kw='; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com/gsi/ https://oauth2.googleapis.com/revoke; frame-src https://accounts.google.com/gsi/; object-src 'none'; base-uri 'self'; form-action 'self'";
 
 const dirs: string[] = [];
 const MANIFEST = JSON.stringify({
@@ -139,10 +139,16 @@ describe('scanDist: service worker and manifest', () => {
     expect(rules(dir)).not.toContain('GOOGLE_HOSTNAME');
   });
 
+  it('allows the bundle to name the approved revoke host', () => {
+    const dir = makeBuiltDist({
+      'assets/index-aaa.js': 'x="https://oauth2.googleapis.com/revoke"',
+    });
+    expect(rules(dir)).not.toContain('GOOGLE_HOSTNAME');
+  });
+
   it.each([
     ['the Google API loader', 'load("https://apis.google.com/js/api.js")'],
     ['a Google static host', 'src="https://www.gstatic.com/x.js"'],
-    ['the OAuth token host', 'fetch("https://oauth2.googleapis.com/revoke")'],
     ['another googleapis host', 'fetch("https://drive.googleapis.com/x")'],
     ['a Google user-content host', 'img("https://lh3.googleusercontent.com/a")'],
     ['www.google.com', 'fetch("https://www.google.com/x")'],
@@ -168,14 +174,38 @@ describe('scanDist: service worker and manifest', () => {
       ),
     ).toContain('CSP_POLICY');
     expect(bad(APPROVED_CSP_CONTENT + "; script-src-elem 'unsafe-inline'")).toContain('CSP_POLICY');
+    expect(bad(APPROVED_CSP_CONTENT + "; style-src-elem 'unsafe-inline'")).toContain('CSP_POLICY');
+    expect(bad(APPROVED_CSP_CONTENT + "; style-src-attr 'unsafe-inline'")).toContain('CSP_POLICY');
+    expect(bad(APPROVED_CSP_CONTENT.replace(/'sha256-[^']*'/, "'unsafe-inline'"))).toContain(
+      'CSP_POLICY',
+    );
+    expect(bad(APPROVED_CSP_CONTENT.replace(/ 'sha256-[^']*'/, ''))).toContain('CSP_POLICY');
     expect(bad(APPROVED_CSP_CONTENT.replace("connect-src 'self'", 'connect-src *'))).toContain(
       'CSP_POLICY',
     );
+    // The whole OAuth host, or any path but /revoke, is not approved.
     expect(
       bad(
         APPROVED_CSP_CONTENT.replace(
-          'https://www.googleapis.com',
-          'https://www.googleapis.com https://oauth2.googleapis.com',
+          'https://oauth2.googleapis.com/revoke',
+          'https://oauth2.googleapis.com',
+        ),
+      ),
+    ).toContain('CSP_POLICY');
+    expect(
+      bad(
+        APPROVED_CSP_CONTENT.replace(
+          'https://oauth2.googleapis.com/revoke',
+          'https://oauth2.googleapis.com/token',
+        ),
+      ),
+    ).toContain('CSP_POLICY');
+    // A different inline-style hash is not approved either.
+    expect(
+      bad(
+        APPROVED_CSP_CONTENT.replace(
+          /'sha256-[^']*'/,
+          "'sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='",
         ),
       ),
     ).toContain('CSP_POLICY');

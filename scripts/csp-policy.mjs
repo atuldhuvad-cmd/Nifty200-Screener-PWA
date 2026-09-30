@@ -1,15 +1,26 @@
 // The one approved Content-Security-Policy and the Google hosts it (and the bundle) may name.
 // Step 10 loosens the original policy ONLY for the exact Google Identity Services and Drive
-// hosts the connect flow needs. Anything else (a new host, a wildcard, inline or eval) fails
+// hosts the connect flow needs. Anything else (a new host, a wildcard, inline script or eval) fails
 // `npm run scan:dist`.
 
 /** @type {Record<string, string[]>} */
 export const APPROVED_CSP = {
   'default-src': ["'self'"],
   'script-src': ["'self'", 'https://accounts.google.com/gsi/client'],
-  'style-src': ["'self'", 'https://accounts.google.com/gsi/style'],
+  // The hash allows exactly one inline style block that Google's sign-in script inserts.
+  'style-src': [
+    "'self'",
+    'https://accounts.google.com/gsi/style',
+    "'sha256-RU4sU0AaS8IBGZx8XrGt/pa9A5SLA3dQszGeqT5L3Kw='",
+  ],
   'img-src': ["'self'", 'data:'],
-  'connect-src': ["'self'", 'https://www.googleapis.com', 'https://accounts.google.com/gsi/'],
+  'connect-src': [
+    "'self'",
+    'https://www.googleapis.com',
+    'https://accounts.google.com/gsi/',
+    // Token revocation on Disconnect: the one URL, not the whole OAuth host.
+    'https://oauth2.googleapis.com/revoke',
+  ],
   'frame-src': ['https://accounts.google.com/gsi/'],
   'object-src': ["'none'"],
   'base-uri': ["'self'"],
@@ -17,7 +28,11 @@ export const APPROVED_CSP = {
 };
 
 /** Google hostnames the shipped bundle may mention (client IDs are handled separately). */
-export const APPROVED_GOOGLE_HOSTS = ['accounts.google.com', 'www.googleapis.com'];
+export const APPROVED_GOOGLE_HOSTS = [
+  'accounts.google.com',
+  'www.googleapis.com',
+  'oauth2.googleapis.com',
+];
 
 /**
  * @param {string} content
