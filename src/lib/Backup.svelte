@@ -271,33 +271,6 @@
 </section>
 
 <style>
-  section > section {
-    margin-block: 1.5rem;
-  }
-
-  div {
-    margin-block: 0.5rem;
-  }
-
-  label {
-    display: inline-block;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-  }
-
-  button {
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: 0.5rem 1rem;
-    background: var(--color-bg);
-    cursor: pointer;
-  }
-
-  button:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-
   .visually-hidden {
     position: absolute;
     width: 1px;

@@ -354,47 +354,10 @@
 {/snippet}
 
 <style>
-  section > section {
-    margin-block: 1.5rem;
-  }
-
-  article {
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: 0.75rem 1rem;
-    margin-block: 1rem;
-    background: var(--color-surface);
-  }
-
-  .scroll {
-    overflow-x: auto;
-  }
-
   .mono {
     font-family: ui-monospace, Consolas, monospace;
     word-break: break-all;
     font-size: 0.85em;
-  }
-
-  button {
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: 0.4rem 0.9rem;
-    background: var(--color-bg);
-    cursor: pointer;
-  }
-
-  button:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-
-  dialog {
-    border: 2px solid var(--color-border);
-    border-radius: 6px;
-    max-width: 32rem;
-    background: var(--color-bg);
-    color: var(--color-text);
   }
 
   .visually-hidden {

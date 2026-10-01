@@ -259,45 +259,6 @@
 </section>
 
 <style>
-  section {
-    margin-block: 1.5rem;
-  }
-
-  div {
-    margin-block: 0.5rem;
-  }
-
-  label {
-    display: inline-block;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-  }
-
-  select {
-    display: block;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: 0.4rem;
-    max-width: 100%;
-  }
-
-  fieldset {
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: 0.75rem 1rem;
-    margin-block: 1rem;
-  }
-
-  .table-scroll {
-    max-width: 100%;
-    overflow-x: auto;
-  }
-
-  table {
-    width: 100%;
-    font-size: 0.9rem;
-  }
-
   .visually-hidden {
     position: absolute;
     width: 1px;

@@ -405,57 +405,6 @@
 </section>
 
 <style>
-  section {
-    margin-block: 1.5rem;
-  }
-
-  div {
-    margin-block: 0.5rem;
-  }
-
-  label {
-    display: inline-block;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-  }
-
-  input[type='date'],
-  input[type='text'] {
-    display: block;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: 0.4rem;
-  }
-
-  button {
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: 0.5rem 1rem;
-    background: var(--color-bg);
-    cursor: pointer;
-  }
-
-  button[type='submit']:not(:disabled) {
-    border-color: var(--color-gold);
-    color: var(--color-gold);
-    font-weight: 600;
-  }
-
-  button:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-
-  .table-scroll {
-    max-width: 100%;
-    overflow-x: auto;
-  }
-
-  table {
-    width: 100%;
-    font-size: 0.9rem;
-  }
-
   .visually-hidden {
     position: absolute;
     width: 1px;
