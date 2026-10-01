@@ -14,7 +14,7 @@ apply. UNKNOWN / INSUFFICIENT_DATA = cannot be concluded from the evidence. Mock
 | ---- | ------- | ----- |
 | 1. Code readiness | Current working tree passes every local automated check | **PASS** (section 2) |
 | 2. Reproducible release identity | A committed SHA, and a build from it that others can recreate | **OPEN.** No commit exists; this is the pre-commit evidence snapshot on base `addc995`; the PR will identify the resulting commit. The bundle also embeds the public OAuth client ID from `.env.local`, so its hash differs per environment |
-| 3. Host verification | Headers, service worker, offline and sign-in behave on the real host | **NOT TESTED.** No host exists; only the local preview server, which applies the same `_headers` file, was exercised |
+| 3. Host verification | Headers, service worker, offline and sign-in behave on the real host | **PASS for the owner-reported checks on `https://n200-screener-git.pages.dev`** (section 9). Android Chrome, screen reader, real Drive conflict and second-account mismatch on the hosted origin remain NOT TESTED |
 | 4. Owner acceptance | Your review of the diff and the real-Google checks you run | **OPEN** (section 8) |
 
 ## 1. Build identity
@@ -206,3 +206,31 @@ summarizing fetch (not a verbatim read; re-check the Cloud Console text before d
 5. Run `SMOKE_TEST_STEP11.md` on localhost (test account, synthetic runs); after a deploy, the "After a real deploy" checks in
    `HOSTING_SETUP.md`.
 6. Optional: manual install on desktop and Android; screen-reader pass.
+
+## 9. Hosted deployment record (owner-provided evidence, 2026-10-01)
+
+All rows below are the owner's reports from the owner's browser and Cloudflare screens. They were not independently re-run
+when this section was written. No CSV or Drive contents were inspected. Counts and codes only.
+
+| Check | State | Evidence (as reported) |
+| ----- | ----- | ---------------------- |
+| Git-connected Cloudflare Pages deployment | **PASS** | Project `n200-screener-git` from GitHub repo `atuldhuvad-cmd/Nifty200-Screener-PWA`, production branch `main`, commit `34fdb4d8f501ad6a826b696ee30ae37e6313e3b0`. Production URL `https://n200-screener-git.pages.dev`; deployment URL `https://34bf41dc.n200-screener-git.pages.dev`. Build log: Node 24.13.1, `npm clean-install`, `npm run build`, `build-sw` wrote `sw.js` version `b524db82d38d17c6`, 8 files uploaded, deployment succeeded |
+| Hosted headers | **PASS** | Read-only checks of `/`, `/sw.js`, `/assets/index-UX_bNZag.js` and `/manifest.webmanifest` returned the expected security headers. `/` and `/sw.js`: `Cache-Control: no-cache`. The asset: `public, max-age=31536000, immutable` |
+| Branding and manifest | **PASS** | Title/header `N200 Screener`; manifest `name` and `short_name` `N200 Screener`, `start_url` `./`, `scope` `./`, `display` `standalone`, expected icons |
+| Service worker registration | **PASS** | Chrome DevTools Application > Service workers (screenshot): scope `https://n200-screener-git.pages.dev/`, source `sw.js`, installed and activated entries |
+| Offline reload | **PASS** | After one online visit, DevTools Network set to Offline, reload: the shell still loaded from the service worker |
+| OAuth Authorized JavaScript origin | **PASS** | `https://n200-screener-git.pages.dev` added in Google Cloud Console as URI 4 (owner-reported). Consent screen stays in Testing; not published |
+| Hosted Google sign-in | **PASS** | After the origin was added, sync status became Connected on `https://n200-screener-git.pages.dev`; no `origin_mismatch` and no blocked popup |
+| Hosted Drive sync/restore | **PASS** | Files checked in Drive 2; restored from Drive 2; failed 0; conflicts kept for review 0; quarantined 0; held back 0; missing from Drive 0 |
+| Installed desktop PWA | **PASS** | Installed name `N200 Screener`; standalone window opens; data still visible |
+| Installed app data visibility | **PASS** | Persistent storage granted; 0 runs without verified remote backup; 2 committed runs restored from Drive, both sync state `synced` and backup `Backed up` |
+
+Still open:
+
+| Item | State |
+| ---- | ----- |
+| Android Chrome install, sign-in, offline | **NOT TESTED** |
+| Screen reader pass | **NOT TESTED** |
+| Real Drive conflict test | **NOT TESTED** |
+| Second-account mismatch on the hosted origin | **NOT TESTED** |
+| Old direct-upload Pages project (`n200-screener`, created 2026-10-01 by `wrangler pages deploy` from a local build of the same commit): keep or delete | **OPEN** (owner decision; nothing deleted) |
