@@ -223,51 +223,6 @@
 </section>
 
 <style>
-  dl {
-    display: grid;
-    grid-template-columns: max-content 1fr;
-    gap: 0.25rem 1rem;
-    margin-block: 1rem;
-  }
-
-  dl > div {
-    display: contents;
-  }
-
-  dt {
-    font-weight: 600;
-  }
-
-  dd {
-    margin: 0;
-  }
-
-  .table-scroll {
-    max-width: 100%;
-    overflow-x: auto;
-  }
-
-  table {
-    width: 100%;
-    font-size: 0.9rem;
-  }
-
-  th button {
-    background: none;
-    border: none;
-    padding: 0;
-    margin: 0;
-    font: inherit;
-    font-weight: 600;
-    color: inherit;
-    cursor: pointer;
-    text-align: left;
-  }
-
-  th button:hover {
-    text-decoration: underline;
-  }
-
   .visually-hidden {
     position: absolute;
     width: 1px;

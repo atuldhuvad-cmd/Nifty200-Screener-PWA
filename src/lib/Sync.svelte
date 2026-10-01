@@ -102,7 +102,7 @@
         ? 'status'
         : 'alert'}
       aria-label="Last sync result"
-      class="result"
+      class="n200-result"
     >
       <p>{describeOutcome(view.outcome, view.failureCode)}</p>
       {#if view.summary}
@@ -216,31 +216,6 @@
     flex-wrap: wrap;
     gap: 0.5rem;
     margin-block: 0.75rem;
-  }
-
-  button {
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: 0.5rem 1rem;
-    background: var(--color-bg);
-    cursor: pointer;
-  }
-
-  button:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-
-  .result {
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: 0.5rem 1rem;
-    margin-block: 0.75rem;
-    background: var(--color-surface);
-  }
-
-  fieldset {
-    margin-block: 1rem;
   }
 
   .visually-hidden {

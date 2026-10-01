@@ -56,6 +56,10 @@
     typeof location === 'undefined' ? false : isReviewRoute(location.hash),
   );
 
+  const onHome = $derived(
+    !onBackupRoute && !onSyncRoute && !onReviewRoute && compareRoute === null,
+  );
+
   async function refresh(database: N200Database): Promise<void> {
     runs = await getAllRuns(database);
     atRiskCount = await countAtRiskRuns(database);
@@ -94,9 +98,24 @@
   });
 </script>
 
-<main>
-  <h1>Nifty 200 Screener</h1>
+<header class="app-header">
+  <div class="app-header__inner">
+    <h1>Nifty 200 Screener</h1>
+    {#if db && !initError}
+      <nav class="app-nav" aria-label="Main">
+        <a href="#/" aria-current={onHome ? 'page' : undefined}>Run history</a>
+        <a href={compareHash()} aria-current={compareRoute !== null ? 'page' : undefined}
+          >Compare stocks</a
+        >
+        <a href={backupHash()} aria-current={onBackupRoute ? 'page' : undefined}>Backup</a>
+        <a href={reviewHash()} aria-current={onReviewRoute ? 'page' : undefined}>Needs review</a>
+        <a href={syncHash()} aria-current={onSyncRoute ? 'page' : undefined}>Sync</a>
+      </nav>
+    {/if}
+  </div>
+</header>
 
+<main class="app-main">
   <Notices />
 
   <UpdateNotice />
@@ -110,14 +129,6 @@
   {#if initError}
     <p role="alert" class="n200-badge n200-badge--error">{initError}</p>
   {:else if db}
-    <nav aria-label="Main">
-      <a href="#/">Run history</a>
-      <a href={compareHash()}>Compare stocks</a>
-      <a href={backupHash()}>Backup</a>
-      <a href={reviewHash()}>Needs review</a>
-      <a href={syncHash()}>Sync</a>
-    </nav>
-
     {#if onBackupRoute}
       <Backup
         {db}
@@ -195,32 +206,20 @@
 </main>
 
 <style>
-  main {
-    max-width: 60rem;
-    margin: 2rem auto;
-    padding: 0 1rem 4rem;
-  }
-
-  h1 {
-    color: var(--color-gold);
-  }
-
   fieldset {
     display: flex;
-    gap: 1.5rem;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
     align-items: center;
-    padding: 0.75rem 1rem;
-    margin-block: 1rem;
   }
 
   fieldset div {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.4rem;
   }
 
-  legend {
-    font-weight: 600;
-    padding-inline: 0.25rem;
+  fieldset label {
+    margin: 0;
   }
 </style>

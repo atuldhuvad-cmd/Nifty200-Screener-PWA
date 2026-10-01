@@ -62,16 +62,6 @@
 </div>
 
 <style>
-  .table-scroll {
-    max-width: 100%;
-    overflow-x: auto;
-  }
-
-  table {
-    width: 100%;
-    font-size: 0.9rem;
-  }
-
   .visually-hidden {
     position: absolute;
     width: 1px;

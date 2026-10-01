@@ -79,12 +79,4 @@
   p {
     margin: 0 0 0.5rem;
   }
-
-  button {
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: 0.4rem 0.9rem;
-    background: var(--color-bg);
-    cursor: pointer;
-  }
 </style>
