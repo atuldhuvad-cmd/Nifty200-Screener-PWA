@@ -1,0 +1,20 @@
+# Reviewed false positives from Gitleaks 8.30.1. Each line is one exact finding (commit:file:rule:line
+# for `gitleaks git`, file:rule:line for `gitleaks dir`). Nothing here is a credential; see
+# RELEASE_REPORT.md section 6 for the analysis. A changed line number, a new match in the same
+# file, or any other file is NOT covered and is reported normally.
+#
+# Generated, minified ajv validators. Rebuilt byte-for-byte from the committed schema by
+# tests/unit/envelope-schema-codegen.test.ts. The match is a 15-character identifier-shaped token
+# on line 4 (one 63 KB line), at the rule's entropy threshold.
+a51e95d0ae53153ffeb73d8a5ee51e1e70a95d12:src/core/envelope/schema/generated/validateEnvelopeV1.js:generic-api-key:4
+f3dad348f2f9a5a4794975553d2afeae3ab15a15:src/core/envelope/schema/generated/validateEnvelopeV2.js:generic-api-key:4
+src/core/envelope/schema/generated/validateEnvelopeV1.js:generic-api-key:4
+src/core/envelope/schema/generated/validateEnvelopeV2.js:generic-api-key:4
+#
+# Test fixtures for the redaction tests in sanitizeDiscoveryMetadata.test.ts. The tests assert
+# these values are replaced by a redaction marker. Line 121 is the public jwt.io sample token
+# (payload {"sub":"1234567890"}); line 130 is an example.com URL with a made-up token parameter.
+b7708171cb91995cb38648ade8bb3121454d10c6:tests/unit/sanitizeDiscoveryMetadata.test.ts:jwt:121
+b7708171cb91995cb38648ade8bb3121454d10c6:tests/unit/sanitizeDiscoveryMetadata.test.ts:generic-api-key:130
+tests/unit/sanitizeDiscoveryMetadata.test.ts:jwt:121
+tests/unit/sanitizeDiscoveryMetadata.test.ts:generic-api-key:130

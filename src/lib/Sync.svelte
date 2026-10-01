@@ -106,7 +106,22 @@
     >
       <p>{describeOutcome(view.outcome, view.failureCode)}</p>
       {#if view.summary}
+        {#if view.summaryStale}
+          <p>
+            This summary is from the last Sync now and may be out of date. Run Sync now to refresh
+            it.
+          </p>
+        {/if}
         <ul>
+          <li>Files checked in Drive: {view.summary.checked}</li>
+          <li>Unchanged: {view.summary.unchanged}</li>
+          <li>Skipped, already on this device: {view.summary.alreadyPresent}</li>
+          <li>Skipped, unsupported version: {view.summary.unsupported}</li>
+          <li>Skipped, duplicate copy: {view.summary.duplicate}</li>
+          <li>Skipped, too large: {view.summary.tooLarge}</li>
+          <li>Skipped, already in Drive's Trash: {view.summary.trashedListed}</li>
+          <li>Updated link to Drive copy: {view.summary.refreshed}</li>
+          <li>Could not be checked just now (still synced): {view.summary.unverified}</li>
           <li>Uploaded: {view.summary.uploaded}</li>
           <li>Restored from Drive: {view.summary.restored}</li>
           <li>Conflicts kept for review: {view.summary.conflicts}</li>

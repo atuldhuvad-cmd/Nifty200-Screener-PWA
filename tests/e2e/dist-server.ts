@@ -45,14 +45,15 @@ export function makeVariant(marker: string): string {
   return dir;
 }
 
-/** Every shell file in a build directory, as URL paths (`/index.html`), excluding sw.js itself. */
+/** Every shell file in a build directory, as URL paths (`/index.html`), excluding sw.js itself and the host `_headers` file. */
 export function shellPaths(dir: string): string[] {
   const out: string[] = [];
   const walk = (current: string): void => {
     for (const name of readdirSync(current)) {
       const path = join(current, name);
       if (statSync(path).isDirectory()) walk(path);
-      else if (relative(dir, path) !== 'sw.js') {
+      // `_headers` configures the host; it is not part of the precached shell.
+      else if (!['sw.js', '_headers'].includes(relative(dir, path))) {
         out.push(`/${relative(dir, path).split(sep).join('/')}`);
       }
     }

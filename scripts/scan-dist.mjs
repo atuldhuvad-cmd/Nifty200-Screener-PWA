@@ -9,6 +9,7 @@ import { join, relative, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import { SHELL_FILE } from './build-sw.mjs';
+import { checkHeadersFile } from './headers-policy.mjs';
 import { APPROVED_GOOGLE_HOSTS, pageCspIsApproved } from './csp-policy.mjs';
 
 /** Content rules: [rule id, pattern]. Deliberately specific to keep false positives near zero. */
@@ -185,6 +186,9 @@ export function scanDist(dir, options = {}) {
     if (!existsSync(indexPath) || !pageCspIsApproved(readFileSync(indexPath, 'utf8'))) {
       findings.push({ rule: 'CSP_POLICY', file: 'index.html' });
     }
+    const headersPath = join(dir, '_headers');
+    const headersText = existsSync(headersPath) ? readFileSync(headersPath, 'utf8') : null;
+    for (const rule of checkHeadersFile(headersText)) findings.push({ rule, file: '_headers' });
   }
   return findings;
 }

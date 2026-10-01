@@ -117,6 +117,10 @@ export class FakeDrive {
     this.validTokens.delete(token);
   }
 
+  /** Emulates Drive's eventually consistent search: a trashed file is still listed. Direct
+   * metadata reads (files.get) are unaffected. */
+  lagTrashInSearch = false;
+
   clearFaults(): void {
     this.faults.length = 0;
   }
@@ -382,7 +386,7 @@ export class FakeDrive {
     return [...this.files.values()].filter((f) => {
       if (this.inaccessibleIds.has(f.id)) return false; // never listed to an app that cannot access it
       if (mime !== undefined && f.mimeType !== mime) return false;
-      if (notTrashed && f.trashed) return false;
+      if (notTrashed && f.trashed && !this.lagTrashInSearch) return false;
       if (parent !== undefined && !f.parents.includes(parent)) return false;
       return props.every(([k, v]) => f.appProperties[k] === v);
     });

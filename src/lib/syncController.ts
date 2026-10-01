@@ -42,6 +42,18 @@ export interface SyncSummary {
   /** Uploads held back (for example while several app folders exist). */
   blocked: number;
   failed: number;
+  /** Counts only, by category: never file names or Drive IDs. */
+  checked: number;
+  unchanged: number;
+  refreshed: number;
+  alreadyPresent: number;
+  unsupported: number;
+  duplicate: number;
+  tooLarge: number;
+  /** Listed by a lagging search index although already in Drive's Trash. */
+  trashedListed: number;
+  /** Synced runs whose Drive file could not be checked this time; they stay synced. */
+  unverified: number;
 }
 
 export type SyncOutcome =
@@ -65,6 +77,8 @@ export interface SyncViewState {
   busy: 'idle' | 'connecting' | 'disconnecting' | 'syncing' | 'restoring';
   locksAvailable: boolean;
   summary: SyncSummary | null;
+  /** The summary is from an earlier sync and a later action may have changed it. */
+  summaryStale: boolean;
   outcome: SyncOutcome | null;
   failureCode: string | null;
   folders: FolderChoice[];
@@ -107,6 +121,15 @@ function summarize(report: Extract<SyncReport, { status: 'ok' }>): SyncSummary {
     missing: report.discovery.missing.length,
     blocked: uploads('blocked'),
     failed: uploads('failed'),
+    checked: files.length,
+    unchanged: count(['unchanged']),
+    refreshed: count(['refreshed']),
+    alreadyPresent: count(['already_present']),
+    unsupported: count(['unsupported_schema']),
+    duplicate: count(['duplicate_remote']),
+    tooLarge: count(['too_large']),
+    trashedListed: count(['trashed']),
+    unverified: report.discovery.unverified,
   };
 }
 
@@ -124,6 +147,7 @@ export function createSyncController(deps: SyncControllerDeps): SyncController {
     busy: 'idle',
     locksAvailable: deps.locksAvailable(),
     summary: null,
+    summaryStale: false,
     outcome: null,
     failureCode: null,
     folders: [],
@@ -157,21 +181,23 @@ export function createSyncController(deps: SyncControllerDeps): SyncController {
         return {
           outcome: 'ok',
           summary: summarize(report),
+          summaryStale: false,
           folders: report.discovery.folderConflict
             ? report.discovery.folders.map((f) => ({ id: f.id, name: f.name ?? f.id }))
             : [],
           failureCode: null,
         };
+      // A sync that did not finish must not leave the previous sync's counts under its message.
       case 'busy':
-        return { outcome: 'busy' };
+        return { outcome: 'busy', summary: null };
       case 'blocked':
-        return { outcome: 'blocked_account' };
+        return { outcome: 'blocked_account', summary: null };
       case 'reconnect_required':
-        return { outcome: 'reconnect_required' };
+        return { outcome: 'reconnect_required', summary: null };
       case 'cancelled':
-        return { outcome: 'cancelled' };
+        return { outcome: 'cancelled', summary: null };
       case 'failed':
-        return { outcome: 'failed', failureCode: report.code };
+        return { outcome: 'failed', failureCode: report.code, summary: null };
     }
   }
 
@@ -230,6 +256,7 @@ export function createSyncController(deps: SyncControllerDeps): SyncController {
         const result = await deps.provider.disconnect();
         set({
           summary: null,
+          summaryStale: false,
           outcome: null,
           failureCode: null,
           folders: [],
@@ -251,9 +278,9 @@ export function createSyncController(deps: SyncControllerDeps): SyncController {
         set(mapReport(report));
       } catch (error) {
         if (error instanceof WebLocksUnavailableError) {
-          set({ outcome: 'locks_unavailable', locksAvailable: false });
+          set({ outcome: 'locks_unavailable', locksAvailable: false, summary: null });
         } else {
-          set({ outcome: 'failed', failureCode: 'UNEXPECTED' });
+          set({ outcome: 'failed', failureCode: 'UNEXPECTED', summary: null });
         }
       } finally {
         set({ busy: 'idle' });
@@ -263,7 +290,7 @@ export function createSyncController(deps: SyncControllerDeps): SyncController {
 
     async chooseFolder(folderId) {
       await selectActiveFolder(deps.db, folderId);
-      set({ folders: [], message: { kind: 'info', code: 'FOLDER_CHOSEN' } });
+      set({ folders: [], summaryStale: true, message: { kind: 'info', code: 'FOLDER_CHOSEN' } });
     },
 
     async restoreRun(runId) {
@@ -273,8 +300,10 @@ export function createSyncController(deps: SyncControllerDeps): SyncController {
         const outcome = await withRequiredActivity(() =>
           restoreToDrive({ db: deps.db, client: deps.client }, runId),
         );
-        if (outcome.status === 'uploaded') set({ message: { kind: 'info', code: 'RESTORED' } });
-        else if (outcome.status === 'reconnect_required') set({ outcome: 'reconnect_required' });
+        if (outcome.status === 'uploaded')
+          set({ summaryStale: true, message: { kind: 'info', code: 'RESTORED' } });
+        else if (outcome.status === 'reconnect_required')
+          set({ outcome: 'reconnect_required', summary: null });
         else set({ message: { kind: 'error', code: 'RESTORE_FAILED' } });
       } catch (error) {
         if (error instanceof WebLocksUnavailableError) {
@@ -292,7 +321,7 @@ export function createSyncController(deps: SyncControllerDeps): SyncController {
       const run = await getRun(deps.db, runId);
       if (run?.sync.state !== 'remote_missing') return;
       const moved = await applyTransition(deps.db, runId, { type: 'KEEP_LOCAL_ONLY' });
-      if (moved.ok) set({ message: { kind: 'info', code: 'KEPT_LOCAL_ONLY' } });
+      if (moved.ok) set({ summaryStale: true, message: { kind: 'info', code: 'KEPT_LOCAL_ONLY' } });
       await refresh();
     },
   };

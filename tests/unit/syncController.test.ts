@@ -175,6 +175,15 @@ describe('sync now', () => {
       missing: 0,
       blocked: 0,
       failed: 0,
+      checked: 0,
+      unchanged: 0,
+      refreshed: 0,
+      alreadyPresent: 0,
+      unsupported: 0,
+      duplicate: 0,
+      tooLarge: 0,
+      trashedListed: 0,
+      unverified: 0,
     });
     expect((await getRun(h.db, A))?.sync.state).toBe('synced');
     expect(state.busy).toBe('idle');
@@ -246,6 +255,150 @@ describe('folder conflict', () => {
   });
 });
 
+describe('sync summary counts by category', () => {
+  it('counts files checked and unchanged on a repeat sync, so all-zero is not ambiguous', async () => {
+    const { h, controller } = await setup();
+    await addRun(h.db, A);
+    await controller.connect();
+    await controller.syncNow();
+    await controller.syncNow();
+    expect(controller.getState().summary).toMatchObject({
+      checked: 1,
+      unchanged: 1,
+      uploaded: 0,
+      restored: 0,
+    });
+  });
+
+  it('counts unsupported-version files as skipped, with no file names or IDs in the state', async () => {
+    const { h, controller } = await setup();
+    await addRun(h.db, A);
+    await controller.connect();
+    await controller.syncNow();
+    const file = [...h.drive.files.values()].find((f) => f.name === `run-${A}.json`);
+    const tags = file?.appProperties ?? {};
+    const future = h.drive.addFile({
+      name: 'x.json',
+      mimeType: 'application/json',
+      appProperties: tags,
+      content: new TextEncoder().encode(
+        JSON.stringify({ schema_version: 99, run_id: B, envelope_sha256: 'x' }),
+      ),
+    });
+    await controller.syncNow();
+    const summary = controller.getState().summary;
+    expect(summary?.checked).toBe(2);
+    expect((summary?.unsupported ?? 0) + (summary?.quarantined ?? 0)).toBe(1);
+    const text = JSON.stringify(controller.getState());
+    expect(text).not.toContain(future.id);
+    expect(text).not.toContain('x.json');
+  });
+});
+
+describe('summary invalidation and accounting', () => {
+  it('every checked file lands in exactly one category', async () => {
+    const { h, controller } = await setup();
+    await addRun(h.db, A);
+    await controller.connect();
+    await controller.syncNow();
+    await controller.syncNow();
+    const s = controller.getState().summary;
+    if (!s) throw new Error('no summary');
+    const accounted =
+      s.unchanged +
+      s.refreshed +
+      s.alreadyPresent +
+      s.unsupported +
+      s.duplicate +
+      s.tooLarge +
+      s.trashedListed +
+      s.restored +
+      s.quarantined +
+      s.conflicts;
+    expect(accounted).toBe(s.checked);
+  });
+
+  it('a sync that fails does not leave the previous sync counts under the failure message', async () => {
+    const { h, controller } = await setup();
+    await addRun(h.db, A);
+    await controller.connect();
+    await controller.syncNow();
+    expect(controller.getState().summary).not.toBeNull();
+    h.drive.revokeToken(h.token);
+    await controller.syncNow();
+    expect(controller.getState().outcome).toBe('reconnect_required');
+    expect(controller.getState().summary).toBeNull();
+  });
+
+  it('a Restore to Drive that needs a reconnect drops the old counts instead of showing them under it', async () => {
+    const s = await setup();
+    await addRun(s.h.db, A);
+    await s.controller.connect();
+    await s.controller.syncNow();
+    const fileId = (await getRun(s.h.db, A))?.sync.drive?.file_id ?? '';
+    s.h.drive.deletePermanently(fileId);
+    await s.controller.syncNow();
+    expect(s.controller.getState().summary?.missing).toBe(1);
+    s.h.drive.revokeToken(s.h.token);
+    await s.controller.restoreRun(A);
+    expect(s.controller.getState().outcome).toBe('reconnect_required');
+    expect(s.controller.getState().summary).toBeNull();
+  });
+
+  it('choosing a folder marks the summary stale', async () => {
+    const { h, controller } = await setup();
+    const tags = { n200_app: 'n200-screener', n200_kind: 'folder' };
+    const one = h.drive.addFile({ name: 'F1', mimeType: FOLDER_MIME, appProperties: tags });
+    h.drive.addFile({ name: 'F2', mimeType: FOLDER_MIME, appProperties: tags });
+    await addRun(h.db, A);
+    await controller.connect();
+    await controller.syncNow();
+    await controller.chooseFolder(one.id);
+    expect(controller.getState().summaryStale).toBe(true);
+  });
+
+  it('a failed Restore to Drive leaves the summary marker unchanged', async () => {
+    const s = await setup();
+    await addRun(s.h.db, A);
+    await s.controller.connect();
+    await s.controller.syncNow();
+    const fileId = (await getRun(s.h.db, A))?.sync.drive?.file_id ?? '';
+    s.h.drive.deletePermanently(fileId);
+    await s.controller.syncNow();
+    s.h.drive.fail({
+      when: (r) => r.method === 'POST',
+      status: 403,
+      reason: 'forbidden',
+      times: 20,
+    });
+    await s.controller.restoreRun(A);
+    expect(s.controller.getState().summaryStale).toBe(false);
+    expect(s.controller.getState().message).toMatchObject({ kind: 'error' });
+  });
+
+  it('a transient probe failure shows as "could not be checked" and the sync still uploads', async () => {
+    const { h, controller } = await setup();
+    await addRun(h.db, A);
+    await controller.connect();
+    await controller.syncNow();
+    await addRun(h.db, B, 'SYNTHETIC_non_ascii_names.csv');
+    const fileId = (await getRun(h.db, A))?.sync.drive?.file_id ?? '';
+    h.drive.fail({
+      when: (r) =>
+        r.method === 'GET' &&
+        r.path === `/drive/v3/files/${fileId}` &&
+        r.query.get('alt') !== 'media',
+      status: 503,
+      times: 50,
+    });
+    await controller.syncNow();
+    const state = controller.getState();
+    expect(state.outcome).toBe('ok');
+    expect(state.summary).toMatchObject({ unverified: 1, uploaded: 1 });
+    expect((await getRun(h.db, A))?.sync.state).toBe('synced');
+  });
+});
+
 describe('remote_missing actions', () => {
   async function missing() {
     const s = await setup();
@@ -272,6 +425,9 @@ describe('remote_missing actions', () => {
     expect(run?.sync.drive?.file_id).not.toBe(fileId);
     expect(controller.getState().missingRuns).toEqual([]);
     expect(controller.getState().message).toEqual({ kind: 'info', code: 'RESTORED' });
+    expect(controller.getState().summaryStale).toBe(true);
+    await controller.syncNow();
+    expect(controller.getState().summaryStale).toBe(false);
   });
 
   it('Keep local only moves the run to local_only and stops prompting', async () => {
@@ -279,6 +435,7 @@ describe('remote_missing actions', () => {
     await controller.keepLocalOnly(A);
     expect((await getRun(h.db, A))?.sync.state).toBe('local_only');
     expect(controller.getState().missingRuns).toEqual([]);
+    expect(controller.getState().summaryStale).toBe(true);
   });
 
   it('Keep local only is refused for a run that is not remote_missing', async () => {

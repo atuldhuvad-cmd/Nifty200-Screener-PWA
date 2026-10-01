@@ -27,6 +27,7 @@ const SHELL: Record<string, string> = {
   'icons/icon-512.png': 'png512',
   'assets/index-aaa.js': 'export default 1;',
   'assets/index-aaa.css': 'body{margin:0}',
+  _headers: readFileSync('public/_headers', 'utf8'),
 };
 
 function makeBuiltDist(overrides: Record<string, string> = {}): string {
@@ -51,6 +52,37 @@ function editWorker(dir: string, edit: (source: string) => string): void {
   const path = join(dir, 'sw.js');
   writeFileSync(path, edit(readFileSync(path, 'utf8')));
 }
+
+describe('scanDist: host headers file', () => {
+  it('is required in a production scan, and is not precached by the service worker', () => {
+    const dir = makeBuiltDist();
+    expect(rules(dir)).toEqual([]);
+    expect(readFileSync(join(dir, 'sw.js'), 'utf8')).not.toContain('_headers');
+    rmSync(join(dir, '_headers'));
+    expect(rules(dir)).toEqual(['HEADERS_MISSING']);
+  });
+
+  it('fails when a protection is removed or a policy is loosened', () => {
+    const original = SHELL['_headers'] ?? '';
+    expect(
+      rules(
+        makeBuiltDist({
+          _headers: original.replace("frame-ancestors 'none'", 'frame-ancestors *'),
+        }),
+      ),
+    ).toEqual(expect.arrayContaining(['HEADERS_REQUIRED:content-security-policy']));
+    expect(
+      rules(
+        makeBuiltDist({
+          _headers: `${original}
+/x
+  Access-Control-Allow-Origin: *
+`,
+        }),
+      ),
+    ).toEqual(expect.arrayContaining(['HEADERS_UNAPPROVED:access-control-allow-origin']));
+  });
+});
 
 describe('scanDist: service worker and manifest', () => {
   it('passes a correctly built output', () => {
