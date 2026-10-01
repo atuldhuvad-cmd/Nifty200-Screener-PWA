@@ -89,8 +89,10 @@
   }
 </script>
 
-<section aria-labelledby="run-detail-heading">
-  <p><a href="#/">&larr; Back to run history</a></p>
+<section aria-labelledby="run-detail-heading" class="screen screen--run-detail">
+  <div class="screen-toolbar">
+    <a class="back-link" href="#/">&larr; Back to run history</a>
+  </div>
 
   {#if !loaded}
     <p>Loading run&hellip;</p>
@@ -100,21 +102,26 @@
     <h2 id="run-detail-heading">Run not available</h2>
     <p role="alert" class="n200-badge n200-badge--warning">{blockedMessage(run)}</p>
   {:else if envelope !== undefined && projection !== undefined}
-    <h2 id="run-detail-heading">Run for {envelope.effective_date}</h2>
-    <dl>
+    <div class="run-hero">
       <div>
+        <p class="eyebrow">Run detail</p>
+        <h2 id="run-detail-heading">Run for {envelope.effective_date}</h2>
+      </div>
+      <div class="run-hero__status">
+        {#if isRunAtRisk(run)}
+          <span class="n200-badge n200-badge--warning">At risk &mdash; no verified backup</span>
+        {:else}
+          <span class="n200-badge n200-badge--success">Backed up</span>
+        {/if}
+      </div>
+    </div>
+
+    <dl class="summary-grid">
+      <div class="summary-card">
         <dt>Effective date</dt>
         <dd>{envelope.effective_date}</dd>
       </div>
-      <div>
-        <dt>Imported</dt>
-        <dd>{envelope.imported_at}</dd>
-      </div>
-      <div>
-        <dt>Universe</dt>
-        <dd>{envelope.universe}</dd>
-      </div>
-      <div>
+      <div class="summary-card">
         <dt>Stock count</dt>
         <dd>
           {envelope.stock_count}
@@ -123,7 +130,19 @@
           {/if}
         </dd>
       </div>
-      <div>
+      <div class="summary-card">
+        <dt>Sync state</dt>
+        <dd>{run.sync.state}</dd>
+      </div>
+      <div class="summary-card">
+        <dt>Universe</dt>
+        <dd>{envelope.universe}</dd>
+      </div>
+      <div class="summary-card summary-card--wide">
+        <dt>Imported</dt>
+        <dd>{envelope.imported_at}</dd>
+      </div>
+      <div class="summary-card summary-card--wide">
         <dt>Source</dt>
         <dd>
           {#each sourceFilenames(envelope) as filename (filename)}
@@ -131,21 +150,7 @@
           {/each}
         </dd>
       </div>
-      <div>
-        <dt>Sync state</dt>
-        <dd>{run.sync.state}</dd>
-      </div>
-      <div>
-        <dt>Backup</dt>
-        <dd>
-          {#if isRunAtRisk(run)}
-            <span class="n200-badge n200-badge--warning">At risk &mdash; no verified backup</span>
-          {:else}
-            <span class="n200-badge n200-badge--success">Backed up</span>
-          {/if}
-        </dd>
-      </div>
-      <div>
+      <div class="summary-card summary-card--wide">
         <dt>Run ID</dt>
         <dd>{run.run_id}</dd>
       </div>
@@ -160,64 +165,73 @@
         This run has zero stocks. It was committed as an explicitly acknowledged empty run.
       </p>
     {:else}
-      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-      <div class="table-scroll" role="region" aria-label="Run stock table" tabindex="0">
-        <table>
-          <caption class="visually-hidden">
-            Full stock table for the run effective {envelope.effective_date}, {projection.rows
-              .length} rows. Column headers are sortable.
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">#</th>
-              {#each columns as col (col.key)}
-                <th scope="col" aria-sort={ariaSortFor(col.key)}>
-                  <button type="button" onclick={() => toggleSort(col.key)}>
-                    {col.label}
-                    {#if sortKey === col.key}
-                      <span aria-hidden="true">{sortDirection === 'asc' ? '▲' : '▼'}</span>
-                    {/if}
-                  </button>
-                  {#if col.isProviderVolumeRatio}
-                    <span class="n200-badge n200-badge--gold"
-                      >provider-reported, not the app ratio</span
-                    >
-                  {/if}
-                </th>
-              {/each}
-            </tr>
-          </thead>
-          <tbody>
-            {#each sortedRows as row, i (row.position)}
+      <section class="data-panel" aria-labelledby="run-table-heading">
+        <div class="data-panel__head">
+          <div>
+            <p class="eyebrow">Data grid</p>
+            <h3 id="run-table-heading">Stocks in this run</h3>
+          </div>
+          <p>{projection.rows.length} row{projection.rows.length === 1 ? '' : 's'}</p>
+        </div>
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <div class="table-scroll" role="region" aria-label="Run stock table" tabindex="0">
+          <table>
+            <caption class="visually-hidden">
+              Full stock table for the run effective {envelope.effective_date}, {projection.rows
+                .length} rows. Column headers are sortable.
+            </caption>
+            <thead>
               <tr>
-                <th scope="row">{i + 1}</th>
+                <th scope="col">#</th>
                 {#each columns as col (col.key)}
-                  <td>
-                    {#if col.role.role === 'sourceFile'}
-                      {row.sourceFilename}
-                    {:else if col.role.role === 'sourceRow'}
-                      {row.sourceRowNumber}
-                    {:else if col.role.role === 'identity'}
-                      {#if identityKeyForIdentity(row.identity) !== null}
-                        <a href={compareHash(identityKeyForIdentity(row.identity))}
-                          >{identityDisplayText(row.identity)}
-                          <span class="visually-hidden">(compare across runs)</span></a
-                        >
-                      {:else}
-                        {identityDisplayText(row.identity)}
+                  <th scope="col" aria-sort={ariaSortFor(col.key)}>
+                    <button type="button" onclick={() => toggleSort(col.key)}>
+                      {col.label}
+                      {#if sortKey === col.key}
+                        <span aria-hidden="true">{sortDirection === 'asc' ? '▲' : '▼'}</span>
                       {/if}
-                    {:else if col.role.role === 'appVolumeRatio'}
-                      {describeVolumeRatio(row.volumeRatio)}
-                    {:else}
-                      {rawCellDisplayText(row, col.role.columnIndex)}
+                    </button>
+                    {#if col.isProviderVolumeRatio}
+                      <span class="n200-badge n200-badge--gold"
+                        >provider-reported, not the app ratio</span
+                      >
                     {/if}
-                  </td>
+                  </th>
                 {/each}
               </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {#each sortedRows as row, i (row.position)}
+                <tr>
+                  <th scope="row">{i + 1}</th>
+                  {#each columns as col (col.key)}
+                    <td>
+                      {#if col.role.role === 'sourceFile'}
+                        {row.sourceFilename}
+                      {:else if col.role.role === 'sourceRow'}
+                        {row.sourceRowNumber}
+                      {:else if col.role.role === 'identity'}
+                        {#if identityKeyForIdentity(row.identity) !== null}
+                          <a href={compareHash(identityKeyForIdentity(row.identity))}
+                            >{identityDisplayText(row.identity)}
+                            <span class="visually-hidden">(compare across runs)</span></a
+                          >
+                        {:else}
+                          {identityDisplayText(row.identity)}
+                        {/if}
+                      {:else if col.role.role === 'appVolumeRatio'}
+                        {describeVolumeRatio(row.volumeRatio)}
+                      {:else}
+                        {rawCellDisplayText(row, col.role.columnIndex)}
+                      {/if}
+                    </td>
+                  {/each}
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </section>
     {/if}
   {/if}
 </section>

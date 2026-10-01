@@ -98,8 +98,8 @@
   });
 </script>
 
-<header class="app-header">
-  <div class="app-header__inner">
+<div class="app-shell">
+  <header class="app-header">
     <h1>Nifty 200 Screener</h1>
     {#if db && !initError}
       <nav class="app-nav" aria-label="Main">
@@ -112,98 +112,112 @@
         <a href={syncHash()} aria-current={onSyncRoute ? 'page' : undefined}>Sync</a>
       </nav>
     {/if}
-  </div>
-</header>
+  </header>
 
-<main class="app-main">
-  <Notices />
+  <main class="app-main">
+    <div class="workspace-top">
+      <Notices />
+      <UpdateNotice />
+    </div>
 
-  <UpdateNotice />
-
-  {#if reloadNeeded}
-    <p role="alert" class="n200-badge n200-badge--warning">
-      This app was updated in another tab. Reload this page before continuing.
-    </p>
-  {/if}
-
-  {#if initError}
-    <p role="alert" class="n200-badge n200-badge--error">{initError}</p>
-  {:else if db}
-    {#if onBackupRoute}
-      <Backup
-        {db}
-        onImported={() => {
-          if (db) void refresh(db);
-        }}
-      />
-    {:else if onSyncRoute}
-      <Sync {db} />
-    {:else if onReviewRoute}
-      <Review
-        {db}
-        onChanged={() => {
-          if (db) void refresh(db);
-        }}
-      />
-    {:else if compareRoute !== null}
-      <RunComparison {db} identityKey={compareRoute.identityKey} />
-    {:else if selectedRunId !== null}
-      <RunDetail {db} runId={selectedRunId} />
-    {:else}
-      <StatusBar {singleTabWarning} {persist} {atRiskCount} />
-
-      <fieldset>
-        <legend>Import type</legend>
-        <div>
-          <input
-            id="import-mode-single"
-            type="radio"
-            name="import-mode"
-            value="single"
-            checked={importMode === 'single'}
-            onchange={() => {
-              importMode = 'single';
-            }}
-          />
-          <label for="import-mode-single">Single file</label>
-        </div>
-        <div>
-          <input
-            id="import-mode-multipart"
-            type="radio"
-            name="import-mode"
-            value="multipart"
-            checked={importMode === 'multipart'}
-            onchange={() => {
-              importMode = 'multipart';
-            }}
-          />
-          <label for="import-mode-multipart">Multipart export</label>
-        </div>
-      </fieldset>
-
-      {#if importMode === 'single'}
-        <ImportForm
-          {db}
-          onCommitted={() => {
-            if (db) void refresh(db);
-          }}
-        />
-      {:else}
-        <MultipartImportForm
-          {db}
-          onCommitted={() => {
-            if (db) void refresh(db);
-          }}
-        />
-      {/if}
-
-      <RunHistory {runs} />
+    {#if reloadNeeded}
+      <p role="alert" class="n200-badge n200-badge--warning">
+        This app was updated in another tab. Reload this page before continuing.
+      </p>
     {/if}
-  {:else}
-    <p>Opening local storage&hellip;</p>
-  {/if}
-</main>
+
+    {#if initError}
+      <p role="alert" class="n200-badge n200-badge--error">{initError}</p>
+    {:else if db}
+      {#if onBackupRoute}
+        <Backup
+          {db}
+          onImported={() => {
+            if (db) void refresh(db);
+          }}
+        />
+      {:else if onSyncRoute}
+        <Sync {db} />
+      {:else if onReviewRoute}
+        <Review
+          {db}
+          onChanged={() => {
+            if (db) void refresh(db);
+          }}
+        />
+      {:else if compareRoute !== null}
+        <RunComparison {db} identityKey={compareRoute.identityKey} />
+      {:else if selectedRunId !== null}
+        <RunDetail {db} runId={selectedRunId} />
+      {:else}
+        <section class="dashboard" aria-label="Import and run history workspace">
+          <div class="dashboard__side">
+            <StatusBar {singleTabWarning} {persist} {atRiskCount} />
+
+            <section class="tool-panel" aria-labelledby="import-mode-heading">
+              <div class="tool-panel__head">
+                <h2 id="import-mode-heading">Import workspace</h2>
+                <p>Choose a source type, preview it, then commit the run.</p>
+              </div>
+
+              <fieldset class="segmented-control">
+                <legend>Import type</legend>
+                <div>
+                  <input
+                    id="import-mode-single"
+                    type="radio"
+                    name="import-mode"
+                    value="single"
+                    checked={importMode === 'single'}
+                    onchange={() => {
+                      importMode = 'single';
+                    }}
+                  />
+                  <label for="import-mode-single">Single file</label>
+                </div>
+                <div>
+                  <input
+                    id="import-mode-multipart"
+                    type="radio"
+                    name="import-mode"
+                    value="multipart"
+                    checked={importMode === 'multipart'}
+                    onchange={() => {
+                      importMode = 'multipart';
+                    }}
+                  />
+                  <label for="import-mode-multipart">Multipart export</label>
+                </div>
+              </fieldset>
+
+              {#if importMode === 'single'}
+                <ImportForm
+                  {db}
+                  onCommitted={() => {
+                    if (db) void refresh(db);
+                  }}
+                />
+              {:else}
+                <MultipartImportForm
+                  {db}
+                  onCommitted={() => {
+                    if (db) void refresh(db);
+                  }}
+                />
+              {/if}
+            </section>
+          </div>
+
+          <div class="dashboard__main">
+            <RunHistory {runs} />
+          </div>
+        </section>
+      {/if}
+    {:else}
+      <p>Opening local storage&hellip;</p>
+    {/if}
+  </main>
+</div>
 
 <style>
   fieldset {

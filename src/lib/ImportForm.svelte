@@ -182,11 +182,17 @@
   }
 </script>
 
-<section aria-labelledby="import-heading">
-  <h2 id="import-heading">Import a CSV</h2>
+<section aria-labelledby="import-heading" class="import-workflow">
+  <div class="workflow-head">
+    <div>
+      <p class="eyebrow">Step 1</p>
+      <h2 id="import-heading">Import a CSV</h2>
+    </div>
+  </div>
 
-  <div>
+  <div class="drop-zone">
     <label for="csv-file">Choose a Nifty 200 CSV file</label>
+    <p>Pick one export, preview the parsed rows, then confirm the run.</p>
     <input
       bind:this={fileInputEl}
       id="csv-file"
