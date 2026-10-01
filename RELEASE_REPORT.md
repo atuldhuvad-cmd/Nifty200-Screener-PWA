@@ -87,7 +87,7 @@ local fake Google or Drive.
 | Step 11 probe error classes | `sync-reconcile`: trashed, present, deleted, inaccessible (403) = not missing, transient 503 = counted `unverified` and sync continues, 401 ends the pass as reconnect, cancellation (also between probes), one probe per synced run | PASS (mock) |
 | Step 11 summary: counts partition all checked files; stale after restore, keep-local and folder choice; dropped on failed, blocked, cancelled and reconnect outcomes (including from Restore) | `syncController`, `sync.spec` | PASS (mock) |
 | Changed remote content is a conflict; neither copy overwritten | `storage-ingest`, `sync-reconcile`, `sync.spec` | PASS (mock); Step 10 check 6 not run on real Google |
-| Account mismatch; reconnect after revoke | `sync-engine`, `sync.spec` | PASS (mock); real NOT TESTED |
+| Account mismatch; reconnect after revoke | `sync-engine`, `sync.spec` | PASS (mock); real: reconnect after revoke PASS (owner live smoke 2026-09-30 to 2026-10-01, `SMOKE_TEST_STEP11.md`); second-account mismatch NOT TESTED (Google Testing mode blocked the alternate account before the app received a token) |
 | Backup export/import and collision cases; limits; corrupt entry | `backupManifest`, `backupImport`, `backupLock`, `backup.spec` | PASS (automated). Single-JSON format (A1): ZIP traversal and decompression-bomb cases do not apply |
 | One tab acts; schema upgrade with another tab open prompts reload | `activityLock`, `crosstab.spec` | PASS (automated) |
 | Persistence denied shows a non-blocking at-risk warning | `storage-persistence` (10), `storage-warning.spec` (UI, denial simulated) | PASS (automated) |
@@ -167,14 +167,14 @@ Unresolved:
 | U4 | Repository is PUBLIC and history carries two personal addresses | Medium (privacy) | Owner confirmed public visibility; history unchanged |
 | U5 | Google's injected inline-style hash in the CSP depends on Google's current CSS | Low | Known |
 | U6 | One extra metadata request per synced run per sync (sequential); effect on real quotas UNKNOWN | Low | Known |
-| U7 | Step 10 smoke checks 6, 8, 9, 11, 12 and the Step 11 rows not run on real Google | Medium | OPEN |
+| U7 | Live smoke (`SMOKE_TEST_STEP11.md`): trash detection, summary counts, Restore, Keep local only, revoke/reconnect, consent scope and storage inspection PASS. Still not run: second-account mismatch, real conflict from an edited Drive file (Step 10 check 6), keyboard-only/screen-reader pass | Low-Medium | PARTLY CLOSED |
 | U8 | One e2e test has a tight 30 s cap and failed once under load | Low | Known |
 
 "No defects found" applies only to the code paths and behaviours in section 4 that were inspected and tested here.
 
-Explicitly NOT TESTED: real Google reconnect after revoke, second-account mismatch, real conflict via an edited Drive file, real
+Explicitly NOT TESTED: second-account mismatch on real Google, real conflict via an edited Drive file, real
 trash-lag behaviour and whether real Drive refuses to download a trashed file, the 7-day consent expiry or any elapsed-time
-behaviour, quotas, screen readers, manual install, Android Chrome, Safari, Firefox, previous browser majors, headers as served by
+behaviour, quotas, screen readers (no specific pass was recorded in the live smoke), manual install, Android Chrome, Safari, Firefox, previous browser majors, headers as served by
 Cloudflare.
 
 ## 7a. OAuth: is publishing or verification required? (analysis; no change made)
