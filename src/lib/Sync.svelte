@@ -34,14 +34,55 @@
   }
 </script>
 
-<section aria-labelledby="sync-heading">
-  <h2 id="sync-heading">Google Drive sync</h2>
-  <p>
-    Sync is optional and only runs when you press <strong>Sync now</strong>. It copies your runs to
-    a folder in your own Google Drive, and can restore them on another device. The files are
-    readable, unencrypted JSON, protected only by your Google account. The app can only see files it
-    created itself.
-  </p>
+<section aria-labelledby="sync-heading" class="screen screen--sync">
+  <div class="screen-heading">
+    <div>
+      <p class="eyebrow">Operations</p>
+      <h2 id="sync-heading">Google Drive sync</h2>
+    </div>
+    <span class="connection-chip">Status: <strong>{STATUS_LABELS[view.oauth]}</strong></span>
+  </div>
+
+  <div class="operation-panel">
+    <div class="operation-panel__copy">
+      <p>
+        Sync is optional and only runs when you press <strong>Sync now</strong>. It copies your runs
+        to a folder in your own Google Drive, and can restore them on another device. The files are
+        readable, unencrypted JSON, protected only by your Google account. The app can only see
+        files it created itself.
+      </p>
+    </div>
+
+    <div class="operation-panel__actions">
+      <p role="status" aria-label="Connection status">
+        Status: <strong>{STATUS_LABELS[view.oauth]}</strong>
+      </p>
+
+      <div class="actions">
+        {#if view.oauth === 'reconnect_required'}
+          <button
+            type="button"
+            disabled={busy || !view.configured}
+            onclick={() => void controller.connect()}>Reconnect Google Drive</button
+          >
+        {:else if view.oauth !== 'connected'}
+          <button
+            type="button"
+            disabled={busy || !view.configured}
+            onclick={() => void controller.connect()}>Connect Google Drive</button
+          >
+        {/if}
+        <button type="button" disabled={!canSync} onclick={() => void controller.syncNow()}
+          >Sync now</button
+        >
+        {#if view.oauth === 'connected' || view.oauth === 'reconnect_required'}
+          <button type="button" disabled={busy} onclick={() => void controller.disconnect()}
+            >Disconnect</button
+          >
+        {/if}
+      </div>
+    </div>
+  </div>
 
   {#if !view.configured}
     <p role="status" class="n200-badge n200-badge--warning">
@@ -54,34 +95,6 @@
       {describeOutcome('locks_unavailable', null)}
     </p>
   {/if}
-
-  <p role="status" aria-label="Connection status">
-    Status: <strong>{STATUS_LABELS[view.oauth]}</strong>
-  </p>
-
-  <div class="actions">
-    {#if view.oauth === 'reconnect_required'}
-      <button
-        type="button"
-        disabled={busy || !view.configured}
-        onclick={() => void controller.connect()}>Reconnect Google Drive</button
-      >
-    {:else if view.oauth !== 'connected'}
-      <button
-        type="button"
-        disabled={busy || !view.configured}
-        onclick={() => void controller.connect()}>Connect Google Drive</button
-      >
-    {/if}
-    <button type="button" disabled={!canSync} onclick={() => void controller.syncNow()}
-      >Sync now</button
-    >
-    {#if view.oauth === 'connected' || view.oauth === 'reconnect_required'}
-      <button type="button" disabled={busy} onclick={() => void controller.disconnect()}
-        >Disconnect</button
-      >
-    {/if}
-  </div>
 
   {#if view.busy !== 'idle'}
     <p role="status">Working&hellip;</p>
@@ -104,7 +117,12 @@
       aria-label="Last sync result"
       class="n200-result"
     >
-      <p>{describeOutcome(view.outcome, view.failureCode)}</p>
+      <div class="result-head">
+        <div>
+          <p class="eyebrow">Last sync result</p>
+          <p>{describeOutcome(view.outcome, view.failureCode)}</p>
+        </div>
+      </div>
       {#if view.summary}
         {#if view.summaryStale}
           <p>
