@@ -1,30 +1,29 @@
 :root {
-  --color-bg: #f1eee6;
+  --color-bg: #f8fafc;
   --color-panel: #ffffff;
-  --color-surface: #f7f5f0;
-  --color-chrome: #1a1a1a;
-  --color-chrome-text: #f4efe0;
-  --color-gold-on-chrome: #e3c566; /* 9.9:1 on --color-chrome */
-  --color-line: #d6d0c0;
-  --color-text: #1a1a1a;
-  --color-border: #706b5c;
-  --color-gold: #8a6d1f;
-  --color-gold-bg: #fbf1d3;
-  --color-gold-text: #735b10; /* 5.76:1 on --color-gold-bg (AA); --color-gold alone is 4.34:1 */
+  --color-surface: #f1f5f9;
+  --color-chrome: #ffffff;
+  --color-line: #e2e8f0;
+  --color-text: #0f172a;
+  --color-muted: #475569;
+  --color-border: #64748b;
+  --color-accent: #0f5fc2; /* 6.3:1 on white */
+  --color-accent-hover: #0b4a9b;
+  --color-accent-bg: #e8f1fc;
   --color-error: #a6280f;
-  --color-error-bg: #fbe9e6;
+  --color-error-bg: #fdeeeb;
   --color-warning: #7a4c00;
-  --color-warning-bg: #fbf0da;
+  --color-warning-bg: #fdf3dc;
   --color-success: #185c34;
-  --color-success-bg: #e4f3e9;
-  --color-focus: #1a4b8c;
+  --color-success-bg: #e6f4ec;
+  --color-focus: #0f5fc2;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
   --space-6: 1.5rem;
-  --radius: 8px;
-  --shadow: 0 1px 2px rgb(26 26 26 / 8%);
+  --radius: 6px;
+  --shadow: none;
 }
 
 * {
@@ -89,78 +88,85 @@ textarea {
   outline-offset: 2px;
 }
 
-.app-header :focus-visible {
-  outline-color: var(--color-gold-on-chrome);
-}
-
 /* ---- App shell ---- */
 .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   background: var(--color-chrome);
-  color: var(--color-chrome-text);
-  border-bottom: 3px solid var(--color-gold);
+  border-bottom: 1px solid var(--color-line);
   padding-top: env(safe-area-inset-top);
 }
 
 .app-header__inner,
 .app-main {
-  max-width: 64rem;
+  max-width: 68rem;
   margin: 0 auto;
   padding-inline: var(--space-4);
 }
 
+.app-header__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-6);
+}
+
 .app-header h1 {
   margin: 0;
-  padding-block: var(--space-3) var(--space-2);
-  font-size: 1.25rem;
-  letter-spacing: 0.02em;
-  color: var(--color-gold-on-chrome);
+  padding-block: var(--space-2);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--color-text);
 }
 
 .app-nav {
   display: flex;
   gap: var(--space-1);
   overflow-x: auto;
+  max-width: 100%;
 }
 
 .app-nav a {
   flex: none;
   padding: var(--space-2) var(--space-3);
-  color: var(--color-chrome-text);
+  color: var(--color-muted);
   text-decoration: none;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -3px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
   white-space: nowrap;
 }
 
 .app-nav a:hover {
-  background: rgb(255 255 255 / 10%);
+  color: var(--color-text);
+  background: var(--color-surface);
 }
 
 .app-nav a[aria-current='page'] {
-  font-weight: 700;
-  color: var(--color-gold-on-chrome);
-  border-bottom-color: var(--color-gold-on-chrome);
+  font-weight: 600;
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
 }
 
 .app-main {
   padding-block: var(--space-4) 4rem;
 }
 
-/* ---- Panels ---- */
+/* ---- Sections: flat, separated by rules; panels only for callouts ---- */
 .app-main > section,
 .app-main > fieldset {
-  background: var(--color-panel);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: var(--space-4);
-  margin-block: var(--space-4);
+  margin-block: var(--space-6);
+}
+
+.app-main > section:first-child {
+  margin-top: var(--space-2);
 }
 
 .app-main section section {
   border-top: 1px solid var(--color-line);
   padding-top: var(--space-4);
-  margin-top: var(--space-4);
+  margin-top: var(--space-6);
 }
 
 .app-main section > h2:first-child + section {
@@ -169,25 +175,18 @@ textarea {
   margin-top: 0;
 }
 
-.app-main section > h2:first-child {
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--color-line);
-}
-
 article {
   border: 1px solid var(--color-line);
   border-radius: var(--radius);
   padding: var(--space-3) var(--space-4);
   margin-block: var(--space-3);
-  background: var(--color-surface);
+  background: var(--color-panel);
 }
 
 .notices {
-  border: 1px solid var(--color-line);
-  border-left: 4px solid var(--color-gold);
-  border-radius: var(--radius);
-  background: var(--color-panel);
-  padding: var(--space-2) var(--space-4);
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-accent-bg);
+  padding: var(--space-2) var(--space-3);
   margin-block: var(--space-3);
   font-size: 0.875rem;
 }
@@ -200,9 +199,44 @@ article {
 .n200-result {
   border: 1px solid var(--color-line);
   border-radius: var(--radius);
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
   margin-block: var(--space-3);
+  background: var(--color-panel);
+}
+
+.n200-result > p:first-child {
+  font-weight: 600;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--space-2);
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+}
+
+.stat-grid li {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: 0;
+  padding: var(--space-2) var(--space-3);
   background: var(--color-surface);
+  border-radius: var(--radius);
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: var(--color-muted);
+}
+
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---- Forms ---- */
@@ -236,7 +270,7 @@ select {
   min-height: 2.5rem;
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--color-panel);
 }
 
@@ -251,7 +285,7 @@ input[type='file'] {
 
 input[type='radio'],
 input[type='checkbox'] {
-  accent-color: var(--color-chrome);
+  accent-color: var(--color-accent);
   width: 1.1rem;
   height: 1.1rem;
 }
@@ -261,7 +295,7 @@ button {
   min-height: 2.5rem;
   padding: var(--space-1) var(--space-4);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--color-panel);
   font-weight: 600;
   cursor: pointer;
@@ -269,17 +303,18 @@ button {
 
 button:hover:not(:disabled) {
   background: var(--color-surface);
-  border-color: var(--color-chrome);
+  border-color: var(--color-text);
 }
 
 button[type='submit']:not(:disabled) {
-  background: var(--color-chrome);
-  border-color: var(--color-chrome);
-  color: var(--color-chrome-text);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
 }
 
 button[type='submit']:not(:disabled):hover {
-  background: #3a3426;
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
 }
 
 button:disabled {
@@ -310,15 +345,16 @@ th button:hover:not(:disabled) {
 }
 
 dialog {
-  border: 2px solid var(--color-chrome);
-  border-radius: var(--radius);
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgb(15 23 42 / 18%);
   max-width: min(32rem, calc(100vw - 2rem));
   background: var(--color-panel);
   color: var(--color-text);
 }
 
 dialog::backdrop {
-  background: rgb(26 26 26 / 55%);
+  background: rgb(15 23 42 / 45%);
 }
 
 /* ---- Tables ---- */
@@ -340,23 +376,22 @@ table {
 th,
 td {
   border-bottom: 1px solid var(--color-line);
-  padding: var(--space-2) var(--space-3);
+  padding: 0.35rem var(--space-3);
   text-align: left;
   vertical-align: top;
 }
 
 thead th {
   background: var(--color-surface);
-  border-bottom: 2px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
   white-space: nowrap;
 }
 
-tbody tr:nth-child(even) {
-  background: #faf8f3;
-}
-
 tbody tr:hover {
-  background: var(--color-gold-bg);
+  background: var(--color-accent-bg);
 }
 
 tr:last-child > td,
@@ -436,8 +471,8 @@ li.n200-badge {
 }
 
 .n200-badge--gold {
-  color: var(--color-gold-text);
-  background: var(--color-gold-bg);
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
 }
 
 /* Non-color cue: each severity gets a text glyph (decorative; the message text carries meaning). */
@@ -463,9 +498,13 @@ li.n200-badge {
 }
 
 @media (max-width: 40rem) {
-  .app-main > section,
-  .app-main > fieldset {
-    padding: var(--space-3);
+  .app-header__inner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .app-nav {
+    flex-wrap: wrap;
   }
 
   dl {
@@ -492,4 +531,8 @@ li.n200-badge {
   body {
     overscroll-behavior-y: none;
   }
+}
+
+.stat-colon {
+  font-size: 0;
 }

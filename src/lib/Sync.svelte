@@ -112,23 +112,83 @@
             it.
           </p>
         {/if}
-        <ul>
-          <li>Files checked in Drive: {view.summary.checked}</li>
-          <li>Unchanged: {view.summary.unchanged}</li>
-          <li>Skipped, already on this device: {view.summary.alreadyPresent}</li>
-          <li>Skipped, unsupported version: {view.summary.unsupported}</li>
-          <li>Skipped, duplicate copy: {view.summary.duplicate}</li>
-          <li>Skipped, too large: {view.summary.tooLarge}</li>
-          <li>Skipped, already in Drive's Trash: {view.summary.trashedListed}</li>
-          <li>Updated link to Drive copy: {view.summary.refreshed}</li>
-          <li>Could not be checked just now (still synced): {view.summary.unverified}</li>
-          <li>Uploaded: {view.summary.uploaded}</li>
-          <li>Restored from Drive: {view.summary.restored}</li>
-          <li>Conflicts kept for review: {view.summary.conflicts}</li>
-          <li>Quarantined files: {view.summary.quarantined}</li>
-          <li>Missing from Drive: {view.summary.missing}</li>
-          <li>Held back: {view.summary.blocked}</li>
-          <li>Failed: {view.summary.failed}</li>
+        <ul class="stat-grid">
+          <li>
+            <span class="stat-label">Files checked in Drive<span class="stat-colon">:</span></span>
+            <span class="stat-value">{view.summary.checked}</span>
+          </li>
+          <li>
+            <span class="stat-label">Unchanged<span class="stat-colon">:</span></span>
+            <span class="stat-value">{view.summary.unchanged}</span>
+          </li>
+          <li>
+            <span class="stat-label"
+              >Skipped, already on this device<span class="stat-colon">:</span></span
+            >
+            <span class="stat-value">{view.summary.alreadyPresent}</span>
+          </li>
+          <li>
+            <span class="stat-label"
+              >Skipped, unsupported version<span class="stat-colon">:</span></span
+            >
+            <span class="stat-value">{view.summary.unsupported}</span>
+          </li>
+          <li>
+            <span class="stat-label">Skipped, duplicate copy<span class="stat-colon">:</span></span>
+            <span class="stat-value">{view.summary.duplicate}</span>
+          </li>
+          <li>
+            <span class="stat-label">Skipped, too large<span class="stat-colon">:</span></span>
+            <span class="stat-value">{view.summary.tooLarge}</span>
+          </li>
+          <li>
+            <span class="stat-label"
+              >Skipped, already in Drive's Trash<span class="stat-colon">:</span></span
+            >
+            <span class="stat-value">{view.summary.trashedListed}</span>
+          </li>
+          <li>
+            <span class="stat-label"
+              >Updated link to Drive copy<span class="stat-colon">:</span></span
+            >
+            <span class="stat-value">{view.summary.refreshed}</span>
+          </li>
+          <li>
+            <span class="stat-label"
+              >Could not be checked just now (still synced)<span class="stat-colon">:</span></span
+            >
+            <span class="stat-value">{view.summary.unverified}</span>
+          </li>
+          <li>
+            <span class="stat-label">Uploaded<span class="stat-colon">:</span></span>
+            <span class="stat-value">{view.summary.uploaded}</span>
+          </li>
+          <li>
+            <span class="stat-label">Restored from Drive<span class="stat-colon">:</span></span>
+            <span class="stat-value">{view.summary.restored}</span>
+          </li>
+          <li>
+            <span class="stat-label"
+              >Conflicts kept for review<span class="stat-colon">:</span></span
+            >
+            <span class="stat-value">{view.summary.conflicts}</span>
+          </li>
+          <li>
+            <span class="stat-label">Quarantined files<span class="stat-colon">:</span></span>
+            <span class="stat-value">{view.summary.quarantined}</span>
+          </li>
+          <li>
+            <span class="stat-label">Missing from Drive<span class="stat-colon">:</span></span>
+            <span class="stat-value">{view.summary.missing}</span>
+          </li>
+          <li>
+            <span class="stat-label">Held back<span class="stat-colon">:</span></span>
+            <span class="stat-value">{view.summary.blocked}</span>
+          </li>
+          <li>
+            <span class="stat-label">Failed<span class="stat-colon">:</span></span>
+            <span class="stat-value">{view.summary.failed}</span>
+          </li>
         </ul>
       {/if}
     </div>
