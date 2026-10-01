@@ -223,25 +223,6 @@
 </section>
 
 <style>
-  dl {
-    display: grid;
-    grid-template-columns: max-content 1fr;
-    gap: 0.25rem 1rem;
-    margin-block: 1rem;
-  }
-
-  dl > div {
-    display: contents;
-  }
-
-  dt {
-    font-weight: 600;
-  }
-
-  dd {
-    margin: 0;
-  }
-
   .visually-hidden {
     position: absolute;
     width: 1px;

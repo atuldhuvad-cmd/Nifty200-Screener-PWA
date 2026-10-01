@@ -163,6 +163,12 @@ textarea {
   margin-top: var(--space-4);
 }
 
+.app-main section > h2:first-child + section {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
 .app-main section > h2:first-child {
   padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--color-line);
@@ -353,7 +359,8 @@ tbody tr:hover {
   background: var(--color-gold-bg);
 }
 
-tr:last-child > td {
+tr:last-child > td,
+tr:last-child > th {
   border-bottom: none;
 }
 
