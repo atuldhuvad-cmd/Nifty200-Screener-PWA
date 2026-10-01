@@ -52,7 +52,7 @@
     FILE_TOO_LARGE: 'This file is larger than the 50 MiB backup limit.',
     INVALID_ENCODING: 'This file is not UTF-8 encoded text.',
     INVALID_JSON: 'This file could not be parsed as JSON.',
-    INVALID_STRUCTURE: 'This file is not shaped like a Nifty 200 Screener backup.',
+    INVALID_STRUCTURE: 'This file is not shaped like an N200 Screener backup.',
     UNSUPPORTED_FORMAT_VERSION: 'This backup was made by an unsupported format version.',
     RUN_COUNT_EXCEEDS_LIMIT: 'This backup has more than the 2,000-run limit.',
     RUN_COUNT_MISMATCH: "This backup's claimed run count does not match its actual contents.",

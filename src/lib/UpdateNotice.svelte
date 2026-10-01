@@ -37,7 +37,7 @@
 {:else if state.kind !== 'none'}
   <div role="status" aria-label="App updates" class="n200-badge n200-badge--gold update">
     {#if state.kind === 'available'}
-      <p>A new version of Nifty 200 Screener is ready.</p>
+      <p>A new version of N200 Screener is ready.</p>
       <p>
         Updating reloads this page and discards any import preview you have not confirmed. Runs
         already saved on this device are not affected.

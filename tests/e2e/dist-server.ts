@@ -34,7 +34,7 @@ export function makeVariant(marker: string): string {
   const indexPath = join(dir, 'index.html');
   const html = readFileSync(indexPath, 'utf8').replace(
     /<title>[^<]*<\/title>/,
-    `<title>Nifty 200 Screener (${marker})</title>`,
+    `<title>N200 Screener (${marker})</title>`,
   );
   writeFileSync(indexPath, html);
   const script = readdirSync(join(dir, 'assets')).find((f) => f.endsWith('.js'));

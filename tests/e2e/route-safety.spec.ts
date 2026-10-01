@@ -73,7 +73,7 @@ test.describe('Route safety: malformed hash values never crash the app (review f
     const { pageErrors, consoleErrors } = trackErrors(page);
     await page.goto('/#/run/%');
 
-    await expect(page.getByRole('heading', { name: 'Nifty 200 Screener' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'N200 Screener' })).toBeVisible();
     // Fresh database, nothing committed yet: the app must still reach its normal empty state
     // (the import UI), never a run-detail render and never a blank/broken page.
     await expect(page.getByRole('heading', { name: 'Import a CSV' })).toBeVisible();
@@ -89,7 +89,7 @@ test.describe('Route safety: malformed hash values never crash the app (review f
     const { pageErrors, consoleErrors } = trackErrors(page);
     await page.goto('/#/compare/%GG');
 
-    await expect(page.getByRole('heading', { name: 'Nifty 200 Screener' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'N200 Screener' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Import a CSV' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Compare a stock across runs' })).toHaveCount(0);
 

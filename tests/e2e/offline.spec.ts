@@ -260,7 +260,7 @@ test.describe('Step 8: user-accepted updates', () => {
       await countControllerChanges(page);
       expect(await checkForUpdate(page)).toBe('installed');
       const notice = updates(page);
-      await expect(notice).toContainText('A new version of Nifty 200 Screener is ready.');
+      await expect(notice).toContainText('A new version of N200 Screener is ready.');
       // The consequence is stated BEFORE the user accepts, not after.
       await expect(notice).toContainText(
         'Updating reloads this page and discards any import preview you have not confirmed.',

@@ -120,7 +120,7 @@ test.describe('Step 6B: conflict and quarantine review', () => {
       resolved.getByRole('button', { name: `Export variant 1 of run ${runId}` }),
     ).toBeVisible();
 
-    await goTo(page, 'Run history', 'Nifty 200 Screener');
+    await goTo(page, 'Run history', 'N200 Screener');
     await expect(page.getByRole('link', { name: /^Open run/ })).toBeVisible();
     await page.getByRole('link', { name: 'Compare stocks' }).click();
     await expect(page.getByRole('combobox').first().locator('option')).not.toHaveCount(1);
