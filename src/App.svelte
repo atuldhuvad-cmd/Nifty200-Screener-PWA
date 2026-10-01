@@ -100,7 +100,7 @@
 
 <div class="app-shell">
   <header class="app-header">
-    <h1>Nifty 200 Screener</h1>
+    <h1>N200 Screener</h1>
     {#if db && !initError}
       <nav class="app-nav" aria-label="Main">
         <a href="#/" aria-current={onHome ? 'page' : undefined}>Run history</a>

@@ -10,7 +10,7 @@ const APPROVED_CSP_CONTENT =
 
 const dirs: string[] = [];
 const MANIFEST = JSON.stringify({
-  name: 'Nifty 200 Screener',
+  name: 'N200 Screener',
   short_name: 'N200 Screener',
   start_url: './',
   scope: './',
