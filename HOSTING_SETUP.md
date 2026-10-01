@@ -1,7 +1,7 @@
 # Hosting and OAuth setup (prepared locally; nothing provisioned)
 
 Status: **PROVISIONED (Git-connected, owner-verified 2026-10-01).** Production origin `https://n200-screener-git.pages.dev`
-(project `n200-screener-git`); evidence in `RELEASE_REPORT.md` section 9. OAuth publishing remains unauthorized (Testing). The
+(project `n200-screener-git`); evidence in `RELEASE_REPORT.md` section 9. The origin is in the OAuth client's Authorized JavaScript origins (owner-reported); OAuth publishing remains unauthorized (Testing). The
 historical text below was written before provisioning; `<ANGLE_BRACKET>` values are no longer unknown. Every value below in `<ANGLE_BRACKETS>` is a placeholder the owner decides. Do not put a real
 client ID, token or secret in this file.
 

@@ -219,7 +219,8 @@ when this section was written. No CSV or Drive contents were inspected. Counts a
 | Branding and manifest | **PASS** | Title/header `N200 Screener`; manifest `name` and `short_name` `N200 Screener`, `start_url` `./`, `scope` `./`, `display` `standalone`, expected icons |
 | Service worker registration | **PASS** | Chrome DevTools Application > Service workers (screenshot): scope `https://n200-screener-git.pages.dev/`, source `sw.js`, installed and activated entries |
 | Offline reload | **PASS** | After one online visit, DevTools Network set to Offline, reload: the shell still loaded from the service worker |
-| Hosted Google sign-in | **PASS** | Sync status became Connected on the hosted origin; no `origin_mismatch` and no blocked popup |
+| OAuth Authorized JavaScript origin | **PASS** | `https://n200-screener-git.pages.dev` added in Google Cloud Console as URI 4 (owner-reported). Consent screen stays in Testing; not published |
+| Hosted Google sign-in | **PASS** | After the origin was added, sync status became Connected on `https://n200-screener-git.pages.dev`; no `origin_mismatch` and no blocked popup |
 | Hosted Drive sync/restore | **PASS** | Files checked in Drive 2; restored from Drive 2; failed 0; conflicts kept for review 0; quarantined 0; held back 0; missing from Drive 0 |
 | Installed desktop PWA | **PASS** | Installed name `N200 Screener`; standalone window opens; data still visible |
 | Installed app data visibility | **PASS** | Persistent storage granted; 0 runs without verified remote backup; 2 committed runs restored from Drive, both sync state `synced` and backup `Backed up` |
