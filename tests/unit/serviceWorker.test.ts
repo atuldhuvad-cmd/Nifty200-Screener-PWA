@@ -277,6 +277,33 @@ describe('service worker: fetch allowlist', () => {
     if (result.intercepted) expect(await result.response.text()).toContain('index.html');
   });
 
+  it.each(['/?homescreen=1', '/?utm_source=pwa', '/index.html?source=pwa'])(
+    'serves the shell for a navigation whose launch URL carries a query string (%s)',
+    async (path) => {
+      const world = await installed();
+      const before = world.fetched.length;
+      const result = await world.fetchEvent(get(path), 'navigate');
+      expect(result.intercepted).toBe(true);
+      expect(world.fetched.length).toBe(before);
+      if (result.intercepted) expect(await result.response.text()).toContain('index.html');
+    },
+  );
+
+  it.each(['/?x=1', '/index.html?x=1'])(
+    'still does not serve a non-navigation request for %s',
+    async (path) => {
+      const world = await installed();
+      expect((await world.fetchEvent(get(path))).intercepted).toBe(false);
+    },
+  );
+
+  it('does not serve the shell for a navigation to a non-shell path, even with a query string', async () => {
+    const world = await installed();
+    expect((await world.fetchEvent(get('/api/drive/files?x=1'), 'navigate')).intercepted).toBe(
+      false,
+    );
+  });
+
   it.each([
     ['a non-GET request', () => get('/index.html', { method: 'POST', body: 'x' })],
     ['a cross-origin request', () => new Request('https://example.com/assets/index-abc123.js')],

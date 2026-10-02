@@ -133,8 +133,13 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   if (request.headers.has('authorization')) return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin || url.search !== '') return;
-  const target = resolveShellTarget(url, request.mode === 'navigate');
+  const isNavigation = request.mode === 'navigate';
+  if (url.origin !== self.location.origin) return;
+  // A query string disqualifies a subresource (it could carry a token), but not a navigation:
+  // launchers append one to the start URL (e.g. Android's home-screen/install launch), and the
+  // shell is static, so the query is never forwarded, stored or answered with anything but the shell.
+  if (url.search !== '' && !isNavigation) return;
+  const target = resolveShellTarget(url, isNavigation);
   if (target === null) return;
   event.respondWith(serveShell(target, request));
 });

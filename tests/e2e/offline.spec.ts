@@ -197,6 +197,28 @@ test.describe('Step 8: registration, offline operation and cache contents', () =
     });
   });
 
+  test('a cold launch while offline loads the shell, including when the launcher appends a query string to the start URL', async ({
+    page,
+    context,
+  }) => {
+    await withServers(async ({ server }) => {
+      await settle(page, server.url, /\(v1\)/);
+      await page.close();
+      await context.setOffline(true);
+      try {
+        for (const suffix of ['/', '/?homescreen=1', '/?utm_source=pwa']) {
+          const cold = await context.newPage();
+          await cold.goto(`${server.url}${suffix}`);
+          await expect(cold).toHaveTitle(/\(v1\)/);
+          await expect(cold.getByRole('navigation', { name: 'Main' })).toBeVisible();
+          await cold.close();
+        }
+      } finally {
+        await context.setOffline(false);
+      }
+    });
+  });
+
   test('Cache Storage holds exactly the versioned shell and the generation record, nothing else', async ({
     page,
   }) => {
