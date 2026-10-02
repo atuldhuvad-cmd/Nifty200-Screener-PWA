@@ -2,6 +2,7 @@ import { FIELD_DEFINITIONS } from '../csv/headers';
 import type { StockIdentity } from '../csv/identifiers';
 import { normalizeForDisplay } from './normalizeForDisplay';
 import type { ProjectedRow, RunRowsProjection } from './runRows';
+import { buildSwingChecklist, describeSwingChecklist } from './swingCriteria';
 import {
   decimalStringSortValue,
   detectColumnKind,
@@ -16,6 +17,7 @@ export type RunTableColumnRole =
   | { role: 'sourceRow' }
   | { role: 'identity' }
   | { role: 'raw'; columnIndex: number }
+  | { role: 'swingChecklist' }
   | { role: 'appVolumeRatio' };
 
 export interface RunTableColumn {
@@ -98,6 +100,16 @@ export function buildRunTableColumns(projection: RunRowsProjection): RunTableCol
           ? numericSortValue(row.cells[columnIndex])
           : textSortValue(row.cells[columnIndex]),
     });
+  });
+
+  columns.push({
+    key: '__swing_checklist__',
+    label: 'Swing checklist (not a score)',
+    role: { role: 'swingChecklist' },
+    kind: 'text',
+    isProviderVolumeRatio: false,
+    getSortValue: (row) =>
+      textSortValue(describeSwingChecklist(buildSwingChecklist(row, projection.columns))),
   });
 
   columns.push({

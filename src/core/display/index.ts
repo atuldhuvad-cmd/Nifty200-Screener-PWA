@@ -21,6 +21,13 @@ export type { DisplayColumn, ProjectedRow, RunRowsProjection } from './runRows';
 export { buildRunTableColumns, identityDisplayText, rawCellDisplayText } from './runTable';
 export type { RunTableColumn, RunTableColumnRole } from './runTable';
 export {
+  buildSwingChecklist,
+  buildSwingChecklistFromCells,
+  describeSwingChecklist,
+  SWING_CSV_PARAMETERS,
+} from './swingCriteria';
+export type { SwingChecklist, SwingCriterionResult, SwingCsvParameter } from './swingCriteria';
+export {
   dateSortValue,
   decimalStringSortValue,
   detectColumnKind,

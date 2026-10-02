@@ -6,9 +6,16 @@
     projectRunRows,
     rawCellDisplayText,
     sortByColumn,
+    buildSwingChecklist,
+    describeSwingChecklist,
     type SortDirection,
   } from '../core/display';
   import type { RunEnvelopeV1, RunEnvelopeV2 } from '../core/envelope';
+  import {
+    fetchNifty200Constituents,
+    verifyRowsAgainstNifty200,
+    type Nifty200Verification,
+  } from '../core/universe';
   import {
     getRun,
     isEnvelopeV1,
@@ -32,6 +39,9 @@
   let loaded = $state(false);
   let sortKey = $state<string | null>(null);
   let sortDirection = $state<SortDirection>('asc');
+  let verifyingNifty200 = $state(false);
+  let nifty200Verification = $state<Nifty200Verification | undefined>(undefined);
+  let nifty200VerificationError = $state<string | undefined>(undefined);
 
   $effect(() => {
     const targetRunId = runId;
@@ -42,6 +52,8 @@
       if (targetRunId !== runId) return; // a newer navigation started; discard this result
       run = found;
       loaded = true;
+      nifty200Verification = undefined;
+      nifty200VerificationError = undefined;
     })();
   });
 
@@ -86,6 +98,21 @@
       return `This run cannot be opened: it is currently ${state.replace('_', ' ')}.`;
     }
     return 'This run cannot be opened: its schema version is not supported by this app version.';
+  }
+
+  async function verifyNifty200Universe(): Promise<void> {
+    if (projection === undefined) return;
+    verifyingNifty200 = true;
+    nifty200Verification = undefined;
+    nifty200VerificationError = undefined;
+    const list = await fetchNifty200Constituents();
+    if (!list.ok) {
+      nifty200VerificationError = list.message;
+      verifyingNifty200 = false;
+      return;
+    }
+    nifty200Verification = verifyRowsAgainstNifty200(projection.rows, list.constituents);
+    verifyingNifty200 = false;
   }
 </script>
 
@@ -160,6 +187,66 @@
       <p>Screener query: {envelope.query_text}</p>
     {/if}
 
+    <section class="data-panel" aria-labelledby="nifty200-verify-heading">
+      <div class="data-panel__head">
+        <div>
+          <p class="eyebrow">Universe check</p>
+          <h3 id="nifty200-verify-heading">Current Nifty 200 membership</h3>
+        </div>
+        <button
+          type="button"
+          class="secondary-button"
+          disabled={verifyingNifty200 || projection.rows.length === 0}
+          onclick={() => {
+            void verifyNifty200Universe();
+          }}
+        >
+          {verifyingNifty200 ? 'Checking…' : 'Fetch NSE list and verify'}
+        </button>
+      </div>
+      <p>
+        This fetches the official Nifty 200 constituents CSV from NSE/Nifty Indices and compares
+        this run by ISIN or NSE Code. Until this check passes, the app only knows what the imported
+        file says.
+      </p>
+      {#if nifty200VerificationError}
+        <p role="alert" class="n200-badge n200-badge--warning">{nifty200VerificationError}</p>
+      {:else if nifty200Verification !== undefined}
+        <p
+          role="status"
+          class="n200-badge {nifty200Verification.missingRows.length === 0 &&
+          nifty200Verification.unverifiedRows.length === 0
+            ? 'n200-badge--success'
+            : 'n200-badge--warning'}"
+        >
+          {nifty200Verification.matchedRows}/{nifty200Verification.runRows} rows matched the current official
+          list. Official list rows: {nifty200Verification.constituentCount}. Checked: {nifty200Verification.checkedAt}.
+        </p>
+        {#if nifty200Verification.missingRows.length > 0}
+          <p>Rows not found in the official list:</p>
+          <ul>
+            {#each nifty200Verification.missingRows as row (row.position)}
+              <li>Row {row.position}: {row.identity}</li>
+            {/each}
+          </ul>
+        {/if}
+        {#if nifty200Verification.unverifiedRows.length > 0}
+          <p>Rows that could not be verified:</p>
+          <ul>
+            {#each nifty200Verification.unverifiedRows as row (row.position)}
+              <li>Row {row.position}: {row.reason}</li>
+            {/each}
+          </ul>
+        {/if}
+        <p>
+          Source:
+          <a href={nifty200Verification.sourceUrl} rel="noreferrer" target="_blank"
+            >NSE/Nifty Indices Nifty 200 constituents CSV</a
+          >
+        </p>
+      {/if}
+    </section>
+
     {#if projection.rows.length === 0}
       <p role="status" class="n200-badge n200-badge--warning">
         This run has zero stocks. It was committed as an explicitly acknowledged empty run.
@@ -173,6 +260,11 @@
           </div>
           <p>{projection.rows.length} row{projection.rows.length === 1 ? '' : 's'}</p>
         </div>
+        <p class="n200-badge n200-badge--gold">
+          Swing checklist is informational only. It does not say Buy, Sell, or Avoid. It does not
+          score stocks, filter automatically, or verify whether the CSV is truly current Nifty 200
+          beyond what the imported file says.
+        </p>
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <div class="table-scroll" role="region" aria-label="Run stock table" tabindex="0">
           <table>
@@ -221,6 +313,8 @@
                         {/if}
                       {:else if col.role.role === 'appVolumeRatio'}
                         {describeVolumeRatio(row.volumeRatio)}
+                      {:else if col.role.role === 'swingChecklist'}
+                        {describeSwingChecklist(buildSwingChecklist(row, projection.columns))}
                       {:else}
                         {rawCellDisplayText(row, col.role.columnIndex)}
                       {/if}

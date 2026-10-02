@@ -34,6 +34,7 @@ const EXPECTED: Record<string, string[]> = {
     'https://www.googleapis.com',
     'https://accounts.google.com/gsi/',
     'https://oauth2.googleapis.com/revoke',
+    'https://www.niftyindices.com/IndexConstituent/ind_nifty200list.csv',
   ],
   'frame-src': ['https://accounts.google.com/gsi/'],
   'object-src': ["'none'"],
@@ -71,6 +72,7 @@ describe('the page CSP (Step 10): loosened only for the exact Google hosts neede
       'https://accounts.google.com/gsi/',
       'https://www.googleapis.com',
       'https://oauth2.googleapis.com/revoke',
+      'https://www.niftyindices.com/IndexConstituent/ind_nifty200list.csv',
     ]);
     for (const host of hosts) expect(allowed.has(host)).toBe(true);
   });
