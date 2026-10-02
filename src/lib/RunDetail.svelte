@@ -310,7 +310,7 @@
         </p>
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <div class="table-scroll" role="region" aria-label="Run stock table" tabindex="0">
-          <table>
+          <table class="run-stock-table">
             <caption class="visually-hidden">
               Full stock table for the run effective {envelope.effective_date}, {projection.rows
                 .length} rows. Column headers are sortable.

@@ -532,6 +532,17 @@ tr:last-child > th {
   border-bottom: none;
 }
 
+.run-stock-table th,
+.run-stock-table td {
+  padding-block: 0.36rem;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.run-stock-table .n200-badge {
+  margin-left: var(--space-1);
+}
+
 .mono {
   font-family: ui-monospace, Consolas, monospace;
   word-break: break-all;
