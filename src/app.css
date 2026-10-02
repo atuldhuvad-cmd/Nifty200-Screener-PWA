@@ -102,6 +102,8 @@ textarea {
 .app-header {
   position: sticky;
   top: 0;
+  display: flex;
+  flex-direction: column;
   height: 100vh;
   padding: var(--space-5) var(--space-4);
   background: var(--color-shell);
@@ -139,6 +141,14 @@ textarea {
 .app-nav a[aria-current='page'] {
   color: #fff;
   background: var(--color-accent);
+}
+
+.app-version {
+  margin-top: auto;
+  padding-top: var(--space-3);
+  color: var(--color-shell-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
 }
 
 .app-main {
@@ -677,6 +687,11 @@ dialog::backdrop {
   .app-nav {
     display: flex;
     flex-wrap: wrap;
+  }
+
+  .app-version {
+    margin-top: var(--space-2);
+    padding-top: 0;
   }
 
   .dashboard,
