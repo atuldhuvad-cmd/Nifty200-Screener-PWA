@@ -3,6 +3,8 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { readFileSync } from 'node:fs';
 import { headersForPath } from './scripts/headers-policy.mjs';
 
+const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
+
 // The preview server (used by the e2e suite) sends the same response headers the host will, from
 // the same file and with the same path matching, so the browser tests run under them.
 const hostHeaders = {
@@ -27,6 +29,9 @@ type HeaderMiddleware = (
 
 export default defineConfig({
   plugins: [svelte(), hostHeaders],
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   build: {
     sourcemap: false,
   },

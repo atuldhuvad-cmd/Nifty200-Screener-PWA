@@ -112,6 +112,7 @@
         <a href={syncHash()} aria-current={onSyncRoute ? 'page' : undefined}>Sync</a>
       </nav>
     {/if}
+    <p class="app-version">N200 Screener v{__APP_VERSION__}</p>
   </header>
 
   <main class="app-main">

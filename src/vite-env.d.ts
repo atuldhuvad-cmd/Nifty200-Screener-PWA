@@ -5,3 +5,6 @@ interface ImportMetaEnv {
   /** Public Google OAuth client ID (no secret). From an untracked .env.local; empty = not set up. */
   readonly VITE_GOOGLE_CLIENT_ID?: string;
 }
+
+/** App version from package.json, injected at build time via vite.config.ts `define`. */
+declare const __APP_VERSION__: string;
