@@ -1,7 +1,8 @@
-// The one approved Content-Security-Policy and the Google hosts it (and the bundle) may name.
+// The one approved Content-Security-Policy and the external hosts it (and the bundle) may name.
 // Step 10 loosens the original policy ONLY for the exact Google Identity Services and Drive
-// hosts the connect flow needs. Anything else (a new host, a wildcard, inline script or eval) fails
-// `npm run scan:dist`.
+// hosts the connect flow needs. The Nifty Indices host is allowed only for the read-only Nifty
+// 200 constituents CSV. Anything else (a new host, a wildcard, inline script or eval) fails `npm
+// run scan:dist`.
 
 /** @type {Record<string, string[]>} */
 export const APPROVED_CSP = {
@@ -20,6 +21,7 @@ export const APPROVED_CSP = {
     'https://accounts.google.com/gsi/',
     // Token revocation on Disconnect: the one URL, not the whole OAuth host.
     'https://oauth2.googleapis.com/revoke',
+    'https://www.niftyindices.com/IndexConstituent/ind_nifty200list.csv',
   ],
   'frame-src': ['https://accounts.google.com/gsi/'],
   'object-src': ["'none'"],
@@ -33,6 +35,8 @@ export const APPROVED_GOOGLE_HOSTS = [
   'www.googleapis.com',
   'oauth2.googleapis.com',
 ];
+
+export const APPROVED_NSE_HOSTS = ['www.niftyindices.com'];
 
 /**
  * @param {string} content

@@ -6,7 +6,7 @@ import { buildServiceWorker } from '../../scripts/build-sw.mjs';
 import { scanDist } from '../../scripts/scan-dist.mjs';
 
 const APPROVED_CSP_CONTENT =
-  "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style 'sha256-RU4sU0AaS8IBGZx8XrGt/pa9A5SLA3dQszGeqT5L3Kw='; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com/gsi/ https://oauth2.googleapis.com/revoke; frame-src https://accounts.google.com/gsi/; object-src 'none'; base-uri 'self'; form-action 'self'";
+  "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style 'sha256-RU4sU0AaS8IBGZx8XrGt/pa9A5SLA3dQszGeqT5L3Kw='; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com/gsi/ https://oauth2.googleapis.com/revoke https://www.niftyindices.com/IndexConstituent/ind_nifty200list.csv; frame-src https://accounts.google.com/gsi/; object-src 'none'; base-uri 'self'; form-action 'self'";
 
 const dirs: string[] = [];
 const MANIFEST = JSON.stringify({

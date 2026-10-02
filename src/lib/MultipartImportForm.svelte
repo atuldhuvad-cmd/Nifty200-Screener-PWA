@@ -2,6 +2,11 @@
   import { analyzeMultipartParts, type MultipartAnalysis } from '../core/csv';
   import { buildMultipartEnvelope, sha256Hex } from '../core/envelope';
   import {
+    buildSwingChecklistFromCells,
+    describeSwingChecklist,
+    type DisplayColumn,
+  } from '../core/display';
+  import {
     commitNewRun,
     findRunsByExactSourceHashSet,
     findRunsBySourceFileHash,
@@ -57,6 +62,35 @@
       !committing &&
       !checkingDuplicates,
   );
+
+  function previewColumns(headers: readonly string[]): DisplayColumn[] {
+    return headers.map((h, i) => ({
+      key: String(i),
+      headerKey: h
+        .replace(/^[ \t\u00A0]+|[ \t\u00A0]+$/g, '')
+        .replace(/[ \t\u00A0]+/g, ' ')
+        .replace(/[A-Z]/g, (c) => c.toLowerCase()),
+      label: h.trim() === '' ? '(blank header)' : h.trim(),
+    }));
+  }
+
+  function swingChecklistText(row: {
+    sourceIndex: number;
+    sourceRowIndex: number;
+    volumeRatio: Parameters<typeof describeVolumeRatio>[0];
+  }): string {
+    const part = previewAnalysis?.parts[row.sourceIndex];
+    if (part === undefined || !part.analysis.ok) return '';
+    const rawRow = part.analysis.parsed.rows[row.sourceRowIndex];
+    if (rawRow === undefined) return '';
+    return describeSwingChecklist(
+      buildSwingChecklistFromCells(
+        previewColumns(part.analysis.parsed.headers),
+        rawRow,
+        row.volumeRatio,
+      ),
+    );
+  }
 
   async function handleFileChange(event: Event): Promise<void> {
     const input = event.currentTarget as HTMLInputElement;
@@ -277,6 +311,11 @@
 
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <div class="table-scroll" role="region" aria-label="Combined preview table" tabindex="0">
+          <p class="n200-badge n200-badge--gold">
+            Swing checklist is informational only. It does not say Buy, Sell, or Avoid. It does not
+            score stocks, filter automatically, or verify whether the CSV is truly current Nifty 200
+            beyond what the imported file says.
+          </p>
           <table>
             <caption class="visually-hidden">Combined multipart preview</caption>
             <thead>
@@ -285,6 +324,7 @@
                 <th scope="col">Source file</th>
                 <th scope="col">Source row</th>
                 <th scope="col">Identity</th>
+                <th scope="col">Swing checklist (not a score)</th>
                 <th scope="col">App Volume Ratio (computed)</th>
               </tr>
             </thead>
@@ -301,6 +341,7 @@
                         ? `NSE Code ${row.identity.normalized_nse_code ?? ''} (provisional)`
                         : 'Not comparable'}
                   </td>
+                  <td>{swingChecklistText(row)}</td>
                   <td>{describeVolumeRatio(row.volumeRatio)}</td>
                 </tr>
               {/each}
