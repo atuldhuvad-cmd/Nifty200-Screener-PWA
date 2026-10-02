@@ -277,6 +277,16 @@ describe('service worker: fetch allowlist', () => {
     if (result.intercepted) expect(await result.response.text()).toContain('index.html');
   });
 
+  it.each(['/?homescreen=1', '/?utm_source=pwa', '/index.html?x=1'])(
+    'serves index.html for cold-launch navigations with query strings to %s',
+    async (path) => {
+      const world = await installed();
+      const result = await world.fetchEvent(get(path), 'navigate');
+      expect(result.intercepted).toBe(true);
+      if (result.intercepted) expect(await result.response.text()).toContain('index.html');
+    },
+  );
+
   it.each([
     ['a non-GET request', () => get('/index.html', { method: 'POST', body: 'x' })],
     ['a cross-origin request', () => new Request('https://example.com/assets/index-abc123.js')],
