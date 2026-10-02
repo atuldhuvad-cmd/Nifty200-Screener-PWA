@@ -225,6 +225,22 @@ when this section was written. No CSV or Drive contents were inspected. Counts a
 | Installed desktop PWA | **PASS** | Installed name `N200 Screener`; standalone window opens; data still visible |
 | Installed app data visibility | **PASS** | Persistent storage granted; 0 runs without verified remote backup; 2 committed runs restored from Drive, both sync state `synced` and backup `Backed up` |
 
+### 9a. Post-merge production verification (PR #15, owner-provided evidence, 2026-10-02)
+
+Recorded from the owner's Cloudflare dashboard and browser checks. Not independently re-run: the agent environment that wrote
+this section cannot reach `pages.dev`, so only the GitHub rows were read directly. Read-only; no deploy, OAuth, Cloudflare or
+Google setting was changed, and no CSV or Drive contents were inspected.
+
+| Check | State | Evidence |
+| ----- | ----- | -------- |
+| `main` head after PR #15 | **PASS** | `cd783f158da25d1358d404675a03a8b65a0a4196` (merge of PR #15); read from GitHub |
+| GitHub CodeQL on the merge commit | **PASS** | "Push on main" run `36937582160` completed with success on `cd783f1`; read from GitHub |
+| Cloudflare Pages production deployment | **PASS** (owner-reported) | Project `n200-screener-git`, Production, branch `main`, source `cd783f1`, deployment URL `https://45d956c1.n200-screener-git.pages.dev` |
+| Production headers | **PASS** (owner-reported) | `https://n200-screener-git.pages.dev/`, `/sw.js`, `/assets/index-UX_bNZag.js` and `/manifest.webmanifest` returned the expected headers. `/` and `/sw.js`: `Cache-Control: no-cache`. The asset: `public, max-age=31536000, immutable` |
+| Branding and manifest | **PASS** (owner-reported) | HTML title/app branding and manifest are `N200 Screener` |
+
+The deployment in section 9 was at `34fdb4d`; this one is at `cd783f1`, a docs-only change, so the hashed asset name is unchanged.
+
 Still open:
 
 | Item | State |
@@ -234,3 +250,4 @@ Still open:
 | Real Drive conflict test | **NOT TESTED** |
 | Second-account mismatch on the hosted origin | **NOT TESTED** |
 | Old direct-upload Pages project (`n200-screener`, created 2026-10-01 by `wrangler pages deploy` from a local build of the same commit): keep or delete | **OPEN** (owner decision; nothing deleted) |
+
