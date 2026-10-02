@@ -13,6 +13,11 @@ export interface Nifty200Constituent {
 export type Nifty200ListResult =
   { ok: true; constituents: Nifty200Constituent[] } | { ok: false; message: string };
 
+export interface FetchNifty200ConstituentsOptions {
+  fetchFn?: typeof fetch;
+  timeoutMs?: number;
+}
+
 export interface Nifty200Verification {
   sourceUrl: string;
   checkedAt: string;
@@ -56,10 +61,19 @@ export function parseNifty200Constituents(bytes: Uint8Array): Nifty200ListResult
 }
 
 export async function fetchNifty200Constituents(
-  fetchFn: typeof fetch = fetch,
+  options: FetchNifty200ConstituentsOptions = {},
 ): Promise<Nifty200ListResult> {
+  const fetchFn = options.fetchFn ?? fetch;
+  const timeoutMs = options.timeoutMs ?? 15000;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
   try {
-    const response = await fetchFn(NIFTY_200_CONSTITUENTS_URL, { cache: 'no-store' });
+    const response = await fetchFn(NIFTY_200_CONSTITUENTS_URL, {
+      cache: 'no-store',
+      signal: controller.signal,
+    });
     if (!response.ok) {
       return {
         ok: false,
@@ -67,11 +81,19 @@ export async function fetchNifty200Constituents(
       };
     }
     return parseNifty200Constituents(new Uint8Array(await response.arrayBuffer()));
-  } catch {
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      return {
+        ok: false,
+        message: 'The NSE Nifty 200 list did not respond in time. Try again later.',
+      };
+    }
     return {
       ok: false,
       message: 'The NSE Nifty 200 list could not be fetched. Check the network and try again.',
     };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

@@ -105,14 +105,16 @@
     verifyingNifty200 = true;
     nifty200Verification = undefined;
     nifty200VerificationError = undefined;
-    const list = await fetchNifty200Constituents();
-    if (!list.ok) {
-      nifty200VerificationError = list.message;
+    try {
+      const list = await fetchNifty200Constituents();
+      if (!list.ok) {
+        nifty200VerificationError = list.message;
+        return;
+      }
+      nifty200Verification = verifyRowsAgainstNifty200(projection.rows, list.constituents);
+    } finally {
       verifyingNifty200 = false;
-      return;
     }
-    nifty200Verification = verifyRowsAgainstNifty200(projection.rows, list.constituents);
-    verifyingNifty200 = false;
   }
 </script>
 
