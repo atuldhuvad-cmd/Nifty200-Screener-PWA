@@ -10,24 +10,32 @@ export interface SwingCsvParameter {
 }
 
 export const SWING_CSV_PARAMETERS: readonly SwingCsvParameter[] = [
-  { key: 'ltp', label: 'LTP', aliases: ['ltp'] },
+  { key: 'ltp', label: 'LTP / Current Price', aliases: ['ltp', 'current price'] },
   { key: 'daySma20', label: 'Day SMA20', aliases: ['day sma20'] },
   { key: 'daySma50', label: 'Day SMA50', aliases: ['day sma50'] },
+  { key: 'daySma200', label: 'Day SMA200', aliases: ['day sma200'] },
   { key: 'dayRsi', label: 'Day RSI', aliases: ['day rsi'] },
   { key: 'dayAdx', label: 'Day ADX', aliases: ['day adx'] },
-  { key: 'roeAnnPct', label: 'ROE Ann %', aliases: ['roe ann %'] },
-  { key: 'roceAnnPct', label: 'ROCE Ann %', aliases: ['roce ann %'] },
+  { key: 'dayMacd', label: 'Day MACD', aliases: ['day macd'] },
+  { key: 'dayMacdSignalLine', label: 'Day MACD Signal Line', aliases: ['day macd signal line'] },
+  {
+    key: 'trendlyneMomentumScore',
+    label: 'Trendlyne Momentum Score',
+    aliases: ['trendlyne momentum score'],
+  },
+  { key: 'roeAnnPct', label: 'ROE Ann %', aliases: ['roe ann %', 'roe annual %'] },
+  { key: 'roceAnnPct', label: 'ROCE Ann %', aliases: ['roce ann %', 'roce annual %'] },
   {
     key: 'interestCoverageAnn',
     label: 'Interest Coverage Ratio Ann',
-    aliases: ['interest coverage ratio ann'],
+    aliases: ['interest coverage ratio ann', 'interest coverage ratio annual'],
   },
   { key: 'piotroskiScore', label: 'Piotroski Score', aliases: ['piotroski score'] },
   { key: 'altmanZscore', label: 'Altman Zscore', aliases: ['altman zscore'] },
   {
     key: 'ltDebtToEquityAnn',
     label: 'LT Debt To Equity Ann',
-    aliases: ['lt debt to equity ann'],
+    aliases: ['lt debt to equity ann', 'long term debt to equity annual'],
   },
 ];
 
@@ -111,8 +119,12 @@ export function buildSwingChecklistFromCells(
   const ltp = textAt(lookup, cells, param('ltp'));
   const sma20 = textAt(lookup, cells, param('daySma20'));
   const sma50 = textAt(lookup, cells, param('daySma50'));
+  const sma200 = textAt(lookup, cells, param('daySma200'));
   const rsi = textAt(lookup, cells, param('dayRsi'));
   const adx = textAt(lookup, cells, param('dayAdx'));
+  const macd = textAt(lookup, cells, param('dayMacd'));
+  const macdSignal = textAt(lookup, cells, param('dayMacdSignalLine'));
+  const momentum = textAt(lookup, cells, param('trendlyneMomentumScore'));
   const roe = textAt(lookup, cells, param('roeAnnPct'));
   const roce = textAt(lookup, cells, param('roceAnnPct'));
   const interestCoverage = textAt(lookup, cells, param('interestCoverageAnn'));
@@ -123,6 +135,9 @@ export function buildSwingChecklistFromCells(
   const ltpValue = validNumber(ltp);
   const sma20Value = validNumber(sma20);
   const sma50Value = validNumber(sma50);
+  const sma200Value = validNumber(sma200);
+  const macdValue = validNumber(macd);
+  const macdSignalValue = validNumber(macdSignal);
 
   const results: SwingCriterionResult[] = [
     criterion(
@@ -146,12 +161,44 @@ export function buildSwingChecklistFromCells(
           : 'fail',
     ),
     criterion(
-      'RSI 40–70',
-      stateFromNumber(rsi, (v) => v.gte(40) && v.lte(70)),
+      'Price above SMA200',
+      ltpValue === null || sma200Value === null
+        ? 'missing'
+        : ltpValue.gt(sma200Value)
+          ? 'pass'
+          : 'fail',
     ),
     criterion(
-      'ADX ≥ 20',
-      stateFromNumber(adx, (v) => v.gte(20)),
+      'SMA20 above SMA50',
+      sma20Value === null || sma50Value === null
+        ? 'missing'
+        : sma20Value.gt(sma50Value)
+          ? 'pass'
+          : 'fail',
+    ),
+    criterion(
+      'RSI 50–70',
+      stateFromNumber(rsi, (v) => v.gte(50) && v.lte(70)),
+    ),
+    criterion(
+      'ADX ≥ 25',
+      stateFromNumber(adx, (v) => v.gte(25)),
+    ),
+    criterion(
+      'MACD > 0',
+      stateFromNumber(macd, (v) => v.gt(0)),
+    ),
+    criterion(
+      'MACD above signal line',
+      macdValue === null || macdSignalValue === null
+        ? 'missing'
+        : macdValue.gt(macdSignalValue)
+          ? 'pass'
+          : 'fail',
+    ),
+    criterion(
+      'Trendlyne Momentum Score ≥ 65',
+      stateFromNumber(momentum, (v) => v.gte(65)),
     ),
     criterion(
       'ROE positive',
