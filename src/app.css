@@ -578,6 +578,15 @@ tr:last-child > th {
   font-size: 0;
 }
 
+.stat-grid li.stat-attn {
+  border-color: var(--color-warning);
+  background: var(--color-warning-bg);
+}
+
+.stat-grid li.stat-attn .stat-value {
+  color: var(--color-warning);
+}
+
 .n200-badge {
   display: inline-flex;
   align-items: center;
@@ -716,6 +725,30 @@ dialog::backdrop {
 
   .segmented-control {
     grid-template-columns: 1fr;
+  }
+
+  .n200-result {
+    padding: var(--space-3);
+    margin-block: var(--space-3);
+  }
+
+  .stat-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
+  }
+
+  .stat-grid li {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+    min-height: 0;
+    padding: 0.125rem var(--space-2);
+  }
+
+  .stat-value {
+    font-size: 1.05rem;
   }
 
   button {

@@ -185,25 +185,25 @@
             <span class="stat-label">Restored from Drive<span class="stat-colon">:</span></span>
             <span class="stat-value">{view.summary.restored}</span>
           </li>
-          <li>
+          <li class:stat-attn={view.summary.conflicts > 0}>
             <span class="stat-label"
               >Conflicts kept for review<span class="stat-colon">:</span></span
             >
             <span class="stat-value">{view.summary.conflicts}</span>
           </li>
-          <li>
+          <li class:stat-attn={view.summary.quarantined > 0}>
             <span class="stat-label">Quarantined files<span class="stat-colon">:</span></span>
             <span class="stat-value">{view.summary.quarantined}</span>
           </li>
-          <li>
+          <li class:stat-attn={view.summary.missing > 0}>
             <span class="stat-label">Missing from Drive<span class="stat-colon">:</span></span>
             <span class="stat-value">{view.summary.missing}</span>
           </li>
-          <li>
+          <li class:stat-attn={view.summary.blocked > 0}>
             <span class="stat-label">Held back<span class="stat-colon">:</span></span>
             <span class="stat-value">{view.summary.blocked}</span>
           </li>
-          <li>
+          <li class:stat-attn={view.summary.failed > 0}>
             <span class="stat-label">Failed<span class="stat-colon">:</span></span>
             <span class="stat-value">{view.summary.failed}</span>
           </li>
