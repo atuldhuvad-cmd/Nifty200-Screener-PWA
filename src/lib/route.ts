@@ -82,3 +82,12 @@ export function reviewHash(): string {
 export function isReviewRoute(hash: string): boolean {
   return hash === '#/review';
 }
+
+/** Informational comparison of the latest Balanced and Technical Only runs. */
+export function candidateReviewHash(): string {
+  return '#/candidate-review';
+}
+
+export function isCandidateReviewRoute(hash: string): boolean {
+  return hash === '#/candidate-review';
+}

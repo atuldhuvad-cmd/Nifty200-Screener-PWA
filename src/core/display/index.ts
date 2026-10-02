@@ -20,6 +20,13 @@ export { projectRunRows } from './runRows';
 export type { DisplayColumn, ProjectedRow, RunRowsProjection } from './runRows';
 export { buildRunTableColumns, identityDisplayText, rawCellDisplayText } from './runTable';
 export type { RunTableColumn, RunTableColumnRole } from './runTable';
+export { buildCandidateReview } from './candidateReview';
+export type {
+  CandidateReviewCandidate,
+  CandidateReviewResult,
+  CandidateReviewRun,
+  ReviewRunKind,
+} from './candidateReview';
 export {
   buildSwingChecklist,
   buildSwingChecklistFromCells,
