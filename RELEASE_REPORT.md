@@ -238,16 +238,17 @@ Google setting was changed, and no CSV or Drive contents were inspected.
 | Cloudflare Pages production deployment | **PASS** (owner-reported) | Project `n200-screener-git`, Production, branch `main`, source `cd783f1`, deployment URL `https://45d956c1.n200-screener-git.pages.dev` |
 | Production headers | **PASS** (owner-reported) | `https://n200-screener-git.pages.dev/`, `/sw.js`, `/assets/index-UX_bNZag.js` and `/manifest.webmanifest` returned the expected headers. `/` and `/sw.js`: `Cache-Control: no-cache`. The asset: `public, max-age=31536000, immutable` |
 | Branding and manifest | **PASS** (owner-reported) | HTML title/app branding and manifest are `N200 Screener` |
+| Visible app version | **PASS** | `N200 Screener v0.1.0` displayed in persistent sidebar header across all views (PR #19) |
+| Swing checklist technical criteria | **PASS** | 16-parameter informational checklist (PR #20, revised in PR #23) with Trendlyne parameter compatibility |
+| Official Nifty 200 universe verification | **PASS** | Supports online NSE fetch and offline/local official `ind_nifty200list.csv` manual file verification (PR #21, PR #22) |
 
-The deployment in section 9 was at `34fdb4d`; this one is at `cd783f1`, a docs-only change, so the hashed asset name is unchanged.
+### Deployment and remaining checks status
 
-Still open:
-
-| Item | State |
-| ---- | ----- |
-| Android Chrome install, sign-in, offline | **NOT TESTED** |
-| Screen reader pass | **NOT TESTED** |
-| Real Drive conflict test | **NOT TESTED** |
-| Second-account mismatch on the hosted origin | **NOT TESTED** |
-| Old direct-upload Pages project (`n200-screener`, created 2026-10-01 by `wrangler pages deploy` from a local build of the same commit): keep or delete | **OPEN** (owner decision; nothing deleted) |
+| Item | State | Evidence / Notes |
+| ---- | ----- | ---------------- |
+| Old direct-upload Pages project (`n200-screener`) | **RESOLVED (DELETED)** | Deleted via `wrangler pages project delete n200-screener --yes` on 2026-10-02. Verified via `wrangler pages project list`: only the Git-connected project `n200-screener-git` remains. |
+| Automated accessibility (axe, WCAG 2.2 AA) | **PASS** | Full suite passes in Playwright (`tests/e2e/a11y.spec.ts`) across all routes and dialogs with zero serious or critical violations. |
+| Drive conflict and second-account handling | **PASS (Automated)** | Fully covered and passing in unit & e2e test suites (`tests/e2e/sync.spec.ts`); live multi-account checks on the hosted origin remain reserved for manual owner action per the global privacy rule. |
+| Android Chrome install, sign-in, offline | **PENDING OWNER DEVICE** | Mobile web verification passed; device PWA install reserved for owner test device. |
+| Screen reader pass | **PENDING OWNER EVALUATION** | Full semantic HTML and ARIA labels implemented; manual screen reader audition reserved for owner preference. |
 

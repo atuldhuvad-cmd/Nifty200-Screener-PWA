@@ -182,4 +182,43 @@ test.describe('Step 5A: run history', () => {
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Run for 2026-08-01' })).toBeVisible();
   });
+
+  test('run stock table remains compact with one-line nowrap cells and horizontal scrolling', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await chooseFile(page, FIXTURE_CRLF_THREE_ROW);
+    await fillRequiredFields(page, '2026-09-01');
+    await confirmImport(page);
+    await openRunRow(page, '2026-09-01');
+
+    const table = page.locator('table.run-stock-table');
+    await expect(table).toBeVisible();
+
+    const scrollContainer = page.locator('.table-scroll');
+    await expect(scrollContainer).toBeVisible();
+
+    // Verify cell styling: white-space nowrap and compact padding
+    const firstTd = table.locator('tbody tr td').first();
+    const whiteSpace = await firstTd.evaluate((el) => window.getComputedStyle(el).whiteSpace);
+    expect(whiteSpace).toBe('nowrap');
+
+    // Verify row height is compact (not blown up by wrapped content)
+    const firstRowHeight = await table
+      .locator('tbody tr')
+      .first()
+      .evaluate((el) => el.getBoundingClientRect().height);
+    expect(firstRowHeight).toBeLessThan(50);
+
+    // Verify on mobile viewport
+    await page.setViewportSize({ width: 390, height: 844 });
+    const isScrollable = await scrollContainer.evaluate((el) => el.scrollWidth > el.clientWidth);
+    expect(isScrollable).toBe(true);
+
+    const mobileFirstRowHeight = await table
+      .locator('tbody tr')
+      .first()
+      .evaluate((el) => el.getBoundingClientRect().height);
+    expect(mobileFirstRowHeight).toBeLessThan(50);
+  });
 });

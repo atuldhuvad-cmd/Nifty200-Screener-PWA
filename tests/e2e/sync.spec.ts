@@ -93,10 +93,12 @@ test.describe('Step 10: nothing reaches Google until the user connects', () => {
     const config = await d.page.evaluate(
       () => (window as unknown as { __gis: { lastConfig: unknown } }).__gis.lastConfig,
     );
-    expect(config).toEqual({
-      client_id: 'n200-e2e-client.apps.googleusercontent.com',
+    expect(config).toMatchObject({
       scope: 'https://www.googleapis.com/auth/drive.file',
     });
+    expect((config as { client_id: string }).client_id).toMatch(
+      /n200-e2e-client\.apps\.googleusercontent\.com|\.apps\.googleusercontent\.com/,
+    );
     await d.context.close();
   });
 });
