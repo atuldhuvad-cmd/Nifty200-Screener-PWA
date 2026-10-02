@@ -9,6 +9,7 @@
     type RunRecord,
   } from './core/storage';
   import Backup from './lib/Backup.svelte';
+  import CandidateReview from './lib/CandidateReview.svelte';
   import { getDatabase } from './lib/db';
   import ImportForm from './lib/ImportForm.svelte';
   import MultipartImportForm from './lib/MultipartImportForm.svelte';
@@ -20,8 +21,10 @@
   import RunHistory from './lib/RunHistory.svelte';
   import {
     backupHash,
+    candidateReviewHash,
     compareHash,
     isBackupRoute,
+    isCandidateReviewRoute,
     isReviewRoute,
     isSyncRoute,
     parseCompareRouteFromHash,
@@ -51,13 +54,20 @@
   let onBackupRoute = $state(
     typeof location === 'undefined' ? false : isBackupRoute(location.hash),
   );
+  let onCandidateReviewRoute = $state(
+    typeof location === 'undefined' ? false : isCandidateReviewRoute(location.hash),
+  );
   let onSyncRoute = $state(typeof location === 'undefined' ? false : isSyncRoute(location.hash));
   let onReviewRoute = $state(
     typeof location === 'undefined' ? false : isReviewRoute(location.hash),
   );
 
   const onHome = $derived(
-    !onBackupRoute && !onSyncRoute && !onReviewRoute && compareRoute === null,
+    !onBackupRoute &&
+      !onCandidateReviewRoute &&
+      !onSyncRoute &&
+      !onReviewRoute &&
+      compareRoute === null,
   );
 
   async function refresh(database: N200Database): Promise<void> {
@@ -86,6 +96,7 @@
       selectedRunId = parseRunIdFromHash(location.hash);
       compareRoute = parseCompareRouteFromHash(location.hash);
       onBackupRoute = isBackupRoute(location.hash);
+      onCandidateReviewRoute = isCandidateReviewRoute(location.hash);
       onReviewRoute = isReviewRoute(location.hash);
       onSyncRoute = isSyncRoute(location.hash);
       // A sync (or restore) changes stored runs while the user is on another view.
@@ -106,6 +117,9 @@
         <a href="#/" aria-current={onHome ? 'page' : undefined}>Run history</a>
         <a href={compareHash()} aria-current={compareRoute !== null ? 'page' : undefined}
           >Compare stocks</a
+        >
+        <a href={candidateReviewHash()} aria-current={onCandidateReviewRoute ? 'page' : undefined}
+          >Candidate review</a
         >
         <a href={backupHash()} aria-current={onBackupRoute ? 'page' : undefined}>Backup</a>
         <a href={reviewHash()} aria-current={onReviewRoute ? 'page' : undefined}>Needs review</a>
@@ -139,6 +153,8 @@
         />
       {:else if onSyncRoute}
         <Sync {db} />
+      {:else if onCandidateReviewRoute}
+        <CandidateReview {runs} />
       {:else if onReviewRoute}
         <Review
           {db}
