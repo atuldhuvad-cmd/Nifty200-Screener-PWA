@@ -13,6 +13,7 @@
   import type { RunEnvelopeV1, RunEnvelopeV2 } from '../core/envelope';
   import {
     fetchNifty200Constituents,
+    parseNifty200Constituents,
     verifyRowsAgainstNifty200,
     type Nifty200Verification,
   } from '../core/universe';
@@ -116,6 +117,32 @@
       verifyingNifty200 = false;
     }
   }
+
+  async function verifyNifty200UniverseFromFile(file: File): Promise<void> {
+    if (projection === undefined) return;
+    verifyingNifty200 = true;
+    nifty200Verification = undefined;
+    nifty200VerificationError = undefined;
+    try {
+      const parsed = parseNifty200Constituents(new Uint8Array(await file.arrayBuffer()));
+      if (!parsed.ok) {
+        nifty200VerificationError = parsed.message;
+        return;
+      }
+      nifty200Verification = verifyRowsAgainstNifty200(projection.rows, parsed.constituents);
+    } catch {
+      nifty200VerificationError = 'The selected Nifty 200 list could not be read.';
+    } finally {
+      verifyingNifty200 = false;
+    }
+  }
+
+  function handleNseListFileChange(event: Event): void {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (file !== undefined) void verifyNifty200UniverseFromFile(file);
+  }
 </script>
 
 <section aria-labelledby="run-detail-heading" class="screen screen--run-detail">
@@ -211,6 +238,20 @@
         this run by ISIN or NSE Code. Until this check passes, the app only knows what the imported
         file says.
       </p>
+      <div class="file-drop">
+        <label for="nifty200-list-file">Or choose the downloaded official NSE list CSV</label>
+        <input
+          id="nifty200-list-file"
+          type="file"
+          accept=".csv,text/csv"
+          disabled={verifyingNifty200 || projection.rows.length === 0}
+          onchange={handleNseListFileChange}
+        />
+        <p>
+          Expected file name: <code>ind_nifty200list.csv</code>. The file is read locally for this
+          check only; it is not stored, synced, or uploaded.
+        </p>
+      </div>
       {#if nifty200VerificationError}
         <p role="alert" class="n200-badge n200-badge--warning">{nifty200VerificationError}</p>
       {:else if nifty200Verification !== undefined}
