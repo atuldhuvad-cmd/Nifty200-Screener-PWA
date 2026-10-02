@@ -13,6 +13,7 @@ export interface CandidateReviewCandidate {
   key: string;
   stock: string;
   row: ProjectedRow;
+  ltp: number | null;
   inBalanced: boolean;
   inTechnical: boolean;
   technicalChecks: {
@@ -112,6 +113,7 @@ function candidates(
       key,
       stock: valueAt(run.projection, row, ['stock', 'name']) ?? 'Unnamed stock',
       row,
+      ltp: value(run.projection, row, ['ltp', 'current price']),
       inBalanced: run.kind === 'balanced',
       inTechnical: run.kind === 'technical',
       technicalChecks: checks(run.projection, row),

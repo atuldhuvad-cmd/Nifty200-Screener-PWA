@@ -9,6 +9,53 @@
   const { runs }: Props = $props();
   const review = $derived(buildCandidateReview(runs));
 
+  type TradeStatus = 'buy' | 'waitlist';
+  type TradePlan = {
+    status: TradeStatus;
+    entryLow: string;
+    entryHigh: string;
+    stopLoss: string;
+  };
+
+  let plans = $state<Record<string, TradePlan>>({});
+
+  $effect(() => {
+    const candidates = [...review.overlap, ...review.technicalOnly];
+    for (const candidate of candidates) {
+      if (plans[candidate.key] === undefined) {
+        plans[candidate.key] = { status: 'waitlist', entryLow: '', entryHigh: '', stopLoss: '' };
+      }
+    }
+  });
+
+  function updatePlan(key: string, field: keyof TradePlan, event: Event): void {
+    const value = (event.currentTarget as HTMLInputElement | HTMLSelectElement).value;
+    plans[key] = {
+      ...(plans[key] ?? { status: 'waitlist', entryLow: '', entryHigh: '', stopLoss: '' }),
+      [field]: value,
+    };
+  }
+
+  function tradeNumbers(candidate: CandidateReviewCandidate): {
+    quantity: number;
+    riskAmount: number;
+    target: number;
+  } | null {
+    const plan = plans[candidate.key];
+    if (plan === undefined) return null;
+    const entry = Number(plan.entryHigh);
+    const stop = Number(plan.stopLoss);
+    if (!Number.isFinite(entry) || !Number.isFinite(stop) || entry <= stop || entry <= 0)
+      return null;
+    const riskBudget = 50000 * 0.01;
+    const quantity = Math.max(
+      0,
+      Math.min(Math.floor(50000 / entry), Math.floor(riskBudget / (entry - stop))),
+    );
+    const riskAmount = quantity * (entry - stop);
+    return { quantity, riskAmount, target: entry + (entry - stop) * 2 };
+  }
+
   function runDate(kind: 'balanced' | 'technical'): string {
     const run = kind === 'balanced' ? review.balanced?.run : review.technical?.run;
     if (run === undefined || !isSupportedEnvelope(run.envelope)) return 'not found';
@@ -36,9 +83,18 @@
     </div>
   </div>
   <p class="n200-badge n200-badge--info">
-    Informational only. This view does not score stocks or say Buy, Sell, or Avoid. It compares your
-    latest two imported screens and points out which technical checks need your attention.
+    Informational only. This view does not score stocks or place trades. Buy candidate and Waitlist
+    are your planning labels. It compares your latest two imported screens and calculates position
+    size only after you enter an entry range and stop loss.
   </p>
+  <section class="trade-assumptions" aria-labelledby="trade-assumptions-heading">
+    <h3 id="trade-assumptions-heading">Trade-plan assumptions</h3>
+    <p>Capital: ₹50,000 · Default risk budget: 1% (₹500) · Default reward-to-risk: 2:1</p>
+    <p>
+      Enter prices from your own plan. Quantity is limited by both the ₹50,000 capital and ₹500 risk
+      budget.
+    </p>
+  </section>
 
   {#if review.balanced === undefined || review.technical === undefined}
     <p class="n200-badge n200-badge--warning">
@@ -67,8 +123,49 @@
       {:else}
         <div class="candidate-list">
           {#each review.overlap as candidate (candidate.key)}
+            {@const plan = plans[candidate.key]}
+            {@const numbers = tradeNumbers(candidate)}
             <article class="candidate-card">
               <h4>{candidate.stock}</h4>
+              <div class="trade-plan">
+                <label
+                  >Status <select
+                    value={plan?.status ?? 'waitlist'}
+                    onchange={(event) => updatePlan(candidate.key, 'status', event)}
+                    ><option value="waitlist">Waitlist</option><option value="buy"
+                      >Buy candidate</option
+                    ></select
+                  ></label
+                >
+                <label
+                  >Entry low <input
+                    inputmode="decimal"
+                    value={plan?.entryLow ?? ''}
+                    onchange={(event) => updatePlan(candidate.key, 'entryLow', event)}
+                  /></label
+                >
+                <label
+                  >Entry high <input
+                    inputmode="decimal"
+                    value={plan?.entryHigh ?? ''}
+                    onchange={(event) => updatePlan(candidate.key, 'entryHigh', event)}
+                  /></label
+                >
+                <label
+                  >Stop loss <input
+                    inputmode="decimal"
+                    value={plan?.stopLoss ?? ''}
+                    onchange={(event) => updatePlan(candidate.key, 'stopLoss', event)}
+                  /></label
+                >
+                {#if numbers}
+                  <p class="trade-plan-result">
+                    Quantity: <strong>{numbers.quantity}</strong> · Max loss:
+                    <strong>₹{numbers.riskAmount.toFixed(2)}</strong>
+                    · 2:1 target: <strong>₹{numbers.target.toFixed(2)}</strong>
+                  </p>
+                {/if}
+              </div>
               <p>Technical checks from the Technical Only run:</p>
               <ul class="candidate-checks">
                 {#each candidate.technicalChecks as check (check.label)}
@@ -98,8 +195,49 @@
       {:else}
         <div class="candidate-list">
           {#each review.technicalOnly as candidate (candidate.key)}
+            {@const plan = plans[candidate.key]}
+            {@const numbers = tradeNumbers(candidate)}
             <article class="candidate-card">
               <h4>{candidate.stock}</h4>
+              <div class="trade-plan">
+                <label
+                  >Status <select
+                    value={plan?.status ?? 'waitlist'}
+                    onchange={(event) => updatePlan(candidate.key, 'status', event)}
+                    ><option value="waitlist">Waitlist</option><option value="buy"
+                      >Buy candidate</option
+                    ></select
+                  ></label
+                >
+                <label
+                  >Entry low <input
+                    inputmode="decimal"
+                    value={plan?.entryLow ?? ''}
+                    onchange={(event) => updatePlan(candidate.key, 'entryLow', event)}
+                  /></label
+                >
+                <label
+                  >Entry high <input
+                    inputmode="decimal"
+                    value={plan?.entryHigh ?? ''}
+                    onchange={(event) => updatePlan(candidate.key, 'entryHigh', event)}
+                  /></label
+                >
+                <label
+                  >Stop loss <input
+                    inputmode="decimal"
+                    value={plan?.stopLoss ?? ''}
+                    onchange={(event) => updatePlan(candidate.key, 'stopLoss', event)}
+                  /></label
+                >
+                {#if numbers}
+                  <p class="trade-plan-result">
+                    Quantity: <strong>{numbers.quantity}</strong> · Max loss:
+                    <strong>₹{numbers.riskAmount.toFixed(2)}</strong>
+                    · 2:1 target: <strong>₹{numbers.target.toFixed(2)}</strong>
+                  </p>
+                {/if}
+              </div>
               <p>These stocks passed the Technical Only screen but not the Balanced screen.</p>
               <ul class="candidate-checks">
                 {#each candidate.technicalChecks as check (check.label)}
