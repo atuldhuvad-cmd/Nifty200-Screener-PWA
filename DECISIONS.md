@@ -1091,3 +1091,15 @@ Test and script changes only; no app behavior, schema, `DB_VERSION`, CSV grammar
 **Live smoke (owner, localhost, dedicated test account, 2026-09-30 to 2026-10-01, recorded in `SMOKE_TEST_STEP11.md`):** PASS: Drive Trash detection, repeat-sync counts, Restore to Drive, Keep local only, revoke and reconnect (consent lists only app-specific Drive file access), storage/privacy inspection, final clean sync with the original account. **NOT TESTED:** second-account mismatch (Google Testing mode blocked the alternate account before the app received a token); a specific keyboard-only or screen-reader pass; real conflict from an edited Drive file; manual install, Android, headers as served by a real host, COOP with the real sign-in popup. See `HOSTING_SETUP.md`.
 
 **Release-candidate Git authorization (2026-09-30):** the owner confirmed intentionally public visibility and authorized branch `codex/step-11-sync-clarity-and-release-prep`, explicit-file staging, gated commit with the noreply identity, push and PR to `main`. No merge or deployment. OAuth stays in Testing; preferred future Cloudflare name is `n200-screener`, subject to availability; provisioning remains unauthorized.
+
+---
+
+## 29. Android installed-PWA offline cold-launch query fallback (2026-10-02)
+
+Owner Android evidence after the Git-connected hosted release: install, standalone launch, Google sign-in, Drive sync/restore and in-session offline navigation all passed, but a closed installed app reopened while offline showed Chrome's “You're offline” screen instead of the N200 Screener shell.
+
+Root cause reproduced locally against a production build: the service worker fetch handler rejected every request with a query string before checking whether it was a navigation. Android installed-app cold launches can include a query string on `/` or `/index.html`; those navigations bypassed the cached shell and failed when the network was unavailable.
+
+Fix: navigation requests to `/` and `/index.html` now resolve to the cached shell even when the URL has a query string. Non-navigation requests with query strings remain unintercepted, so credentialed/cache-sensitive subresources are still never served from the shell cache. Manifest `start_url`/`scope`, headers, OAuth, Drive sync, IndexedDB, CSV parsing and data formats are unchanged.
+
+Verification added: unit tests cover `/`, `/index.html` and query-string cold-launch navigation URLs; the existing non-navigation query-string guard remains. A Playwright regression test opens a fresh page offline at `/?homescreen=1` after a successful online visit and expects the shell to load.

@@ -133,8 +133,10 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   if (request.headers.has('authorization')) return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin || url.search !== '') return;
-  const target = resolveShellTarget(url, request.mode === 'navigate');
+  const isNavigation = request.mode === 'navigate';
+  if (url.origin !== self.location.origin) return;
+  if (!isNavigation && url.search !== '') return;
+  const target = resolveShellTarget(url, isNavigation);
   if (target === null) return;
   event.respondWith(serveShell(target, request));
 });

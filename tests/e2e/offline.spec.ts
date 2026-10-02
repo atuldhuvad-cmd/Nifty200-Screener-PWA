@@ -197,6 +197,25 @@ test.describe('Step 8: registration, offline operation and cache contents', () =
     });
   });
 
+  test('cold-launch navigations with query strings load the shell offline', async ({
+    page,
+    context,
+  }) => {
+    await withServers(async ({ server }) => {
+      await settle(page, server.url, /\(v1\)/);
+      await context.setOffline(true);
+      const coldLaunch = await context.newPage();
+      try {
+        await coldLaunch.goto(`${server.url}/?homescreen=1`, { waitUntil: 'domcontentloaded' });
+        await expect(coldLaunch).toHaveTitle(/\(v1\)/);
+        await expect(coldLaunch.getByRole('navigation', { name: 'Main' })).toBeVisible();
+      } finally {
+        await context.setOffline(false);
+        await coldLaunch.close();
+      }
+    });
+  });
+
   test('Cache Storage holds exactly the versioned shell and the generation record, nothing else', async ({
     page,
   }) => {
