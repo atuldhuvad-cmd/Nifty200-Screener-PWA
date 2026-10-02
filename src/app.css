@@ -566,6 +566,10 @@ tr:last-child > th {
   margin-top: var(--space-2);
 }
 
+.candidate-card .paper-label {
+  margin-top: var(--space-2);
+}
+
 .candidate-checks {
   display: grid;
   gap: var(--space-2);

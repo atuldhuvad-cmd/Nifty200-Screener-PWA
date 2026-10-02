@@ -19,11 +19,38 @@
 
   let plans = $state<Record<string, TradePlan>>({});
 
+  const requiredChecks = ['Price above SMA20', 'RSI 50–70', 'MACD above signal'];
+  const confirmationChecks = [
+    'Price above SMA50',
+    'Price above SMA200',
+    'ADX ≥ 25',
+    'Momentum ≥ 65',
+  ];
+
+  function paperRecommendation(candidate: CandidateReviewCandidate): {
+    status: TradeStatus;
+    reasons: string[];
+  } {
+    const states = new Map(candidate.technicalChecks.map((check) => [check.label, check.state]));
+    const requiredPass = requiredChecks.every((label) => states.get(label) === 'pass');
+    const confirmations = confirmationChecks.filter((label) => states.get(label) === 'pass');
+    const status: TradeStatus = requiredPass && confirmations.length >= 2 ? 'buy' : 'waitlist';
+    const reasons = candidate.technicalChecks
+      .filter((check) => check.state === 'pass')
+      .map((check) => check.label);
+    return { status, reasons };
+  }
+
   $effect(() => {
     const candidates = [...review.overlap, ...review.technicalOnly];
     for (const candidate of candidates) {
       if (plans[candidate.key] === undefined) {
-        plans[candidate.key] = { status: 'waitlist', entryLow: '', entryHigh: '', stopLoss: '' };
+        plans[candidate.key] = {
+          status: paperRecommendation(candidate).status,
+          entryLow: '',
+          entryHigh: '',
+          stopLoss: '',
+        };
       }
     }
   });
@@ -84,8 +111,8 @@
   </div>
   <p class="n200-badge n200-badge--info">
     Informational only. This view does not score stocks or place trades. Buy candidate and Waitlist
-    are your planning labels. It compares your latest two imported screens and calculates position
-    size only after you enter an entry range and stop loss.
+    are paper-trading labels. Buy candidate requires Price above SMA20, RSI 50–70, MACD above its
+    signal, and at least two confirmations from SMA50, SMA200, ADX and Momentum Score.
   </p>
   <section class="trade-assumptions" aria-labelledby="trade-assumptions-heading">
     <h3 id="trade-assumptions-heading">Trade-plan assumptions</h3>
@@ -125,8 +152,20 @@
           {#each review.overlap as candidate (candidate.key)}
             {@const plan = plans[candidate.key]}
             {@const numbers = tradeNumbers(candidate)}
+            {@const recommendation = paperRecommendation(candidate)}
             <article class="candidate-card">
               <h4>{candidate.stock}</h4>
+              <p class="paper-label">
+                <span
+                  class={`n200-badge ${plan?.status === 'buy' ? 'n200-badge--success' : 'n200-badge--warning'}`}
+                  >{plan?.status === 'buy' ? 'Buy candidate (paper only)' : 'Waitlist'}</span
+                >
+              </p>
+              <p>
+                Why: {recommendation.reasons.length > 0
+                  ? recommendation.reasons.join(', ')
+                  : 'required technical conditions are not all met'}.
+              </p>
               <div class="trade-plan">
                 <label
                   >Status <select
@@ -197,8 +236,20 @@
           {#each review.technicalOnly as candidate (candidate.key)}
             {@const plan = plans[candidate.key]}
             {@const numbers = tradeNumbers(candidate)}
+            {@const recommendation = paperRecommendation(candidate)}
             <article class="candidate-card">
               <h4>{candidate.stock}</h4>
+              <p class="paper-label">
+                <span
+                  class={`n200-badge ${plan?.status === 'buy' ? 'n200-badge--success' : 'n200-badge--warning'}`}
+                  >{plan?.status === 'buy' ? 'Buy candidate (paper only)' : 'Waitlist'}</span
+                >
+              </p>
+              <p>
+                Why: {recommendation.reasons.length > 0
+                  ? recommendation.reasons.join(', ')
+                  : 'required technical conditions are not all met'}.
+              </p>
               <div class="trade-plan">
                 <label
                   >Status <select
