@@ -1,6 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
+    DEFAULT_RUN_UNIVERSE,
+    RUN_UNIVERSES,
+    isRunUniverseValid,
+    normalizeRunUniverse,
+    type RunUniverse,
+  } from './core/envelope';
+  import {
     countAtRiskRuns,
     getAllRuns,
     requestPersistentStorage,
@@ -37,6 +44,9 @@
 
   type ImportMode = 'single' | 'multipart';
   let importMode = $state<ImportMode>('single');
+  let universeInput = $state(DEFAULT_RUN_UNIVERSE);
+  const selectedUniverse = $derived<RunUniverse>(normalizeRunUniverse(universeInput));
+  const universeValid = $derived(isRunUniverseValid(selectedUniverse));
 
   let db = $state<N200Database | undefined>(undefined);
   let singleTabWarning = $state(false);
@@ -207,9 +217,35 @@
                 </div>
               </fieldset>
 
+              <div>
+                <label for="run-universe">Index universe</label>
+                <input
+                  id="run-universe"
+                  list="run-universe-options"
+                  bind:value={universeInput}
+                  aria-describedby="run-universe-help"
+                />
+                <datalist id="run-universe-options">
+                  {#each RUN_UNIVERSES as universe (universe)}
+                    <option value={universe}></option>
+                  {/each}
+                  <option value="All Stocks"></option>
+                </datalist>
+                <p id="run-universe-help">
+                  Examples: Nifty 50, Nifty 500, Nifty Midcap 100, Nifty Smallcap 500, All Stocks.
+                </p>
+                {#if !universeValid}
+                  <p role="alert" class="n200-badge n200-badge--error">
+                    Enter the universe name before importing.
+                  </p>
+                {/if}
+              </div>
+
               {#if importMode === 'single'}
                 <ImportForm
                   {db}
+                  universe={selectedUniverse}
+                  {universeValid}
                   onCommitted={() => {
                     if (db) void refresh(db);
                   }}
@@ -217,6 +253,8 @@
               {:else}
                 <MultipartImportForm
                   {db}
+                  universe={selectedUniverse}
+                  {universeValid}
                   onCommitted={() => {
                     if (db) void refresh(db);
                   }}

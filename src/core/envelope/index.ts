@@ -12,6 +12,14 @@ export {
   SCHEMA_VERSION_V1,
   SCHEMA_VERSION_V2,
 } from './types';
+export {
+  DEFAULT_RUN_UNIVERSE,
+  RUN_UNIVERSES,
+  expectedUniverseCount,
+  isRunUniverseValid,
+  normalizeRunUniverse,
+} from './universe';
+export type { RunUniverse } from './universe';
 export type {
   CombinedImportWarning,
   CombinedImportWarningCode,

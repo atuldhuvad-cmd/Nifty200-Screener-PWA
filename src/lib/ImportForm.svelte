@@ -1,6 +1,6 @@
 <script lang="ts">
   import { analyzeCsvBytes, type CsvAnalysis } from '../core/csv';
-  import { buildEnvelope, sha256Hex } from '../core/envelope';
+  import { buildEnvelope, sha256Hex, type RunUniverse } from '../core/envelope';
   import {
     commitNewRun,
     findRunsByOriginalFileHash,
@@ -12,10 +12,12 @@
 
   interface Props {
     db: N200Database;
+    universe: RunUniverse;
+    universeValid: boolean;
     onCommitted: () => void;
   }
 
-  const { db, onCommitted }: Props = $props();
+  const { db, universe, universeValid, onCommitted }: Props = $props();
 
   let fileInputEl: HTMLInputElement | undefined = $state();
   let fileName = $state<string | undefined>(undefined);
@@ -53,6 +55,7 @@
     previewAnalysis !== undefined &&
       effectiveDateValid &&
       attestationChecked &&
+      universeValid &&
       (!isDuplicate || duplicateAck) &&
       (!isEmptyRun || emptyRunAck) &&
       !committing &&
@@ -147,6 +150,7 @@
           originalFilename: capturedName,
           originalFileMimeType: capturedMime,
           effectiveDate,
+          universe,
           ...(trimmedQuery !== '' ? { queryText: trimmedQuery } : {}),
         });
         if (!built.ok) {
@@ -191,7 +195,7 @@
   </div>
 
   <div class="drop-zone">
-    <label for="csv-file">Choose a Nifty 200 CSV file</label>
+    <label for="csv-file">Choose an NSE index CSV file</label>
     <p>Pick one export, preview the parsed rows, then confirm the run.</p>
     <input
       bind:this={fileInputEl}
@@ -252,6 +256,7 @@
         rows={previewAnalysis.parsed.rows}
         rowAnalyses={previewAnalysis.rows}
         providerColumnIndex={previewAnalysis.mapping.columns.providerVolumeRatio}
+        {universe}
       />
 
       <form
@@ -281,7 +286,7 @@
 
         <div>
           <input id="attestation" type="checkbox" bind:checked={attestationChecked} required />
-          <label for="attestation">I confirm this file is a Nifty 200 export.</label>
+          <label for="attestation">I confirm this file is a {universe} export.</label>
         </div>
 
         {#if isDuplicate}

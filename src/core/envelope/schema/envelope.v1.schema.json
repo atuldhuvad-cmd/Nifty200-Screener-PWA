@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://n200-screener.local/schema/envelope.v1.schema.json",
-  "title": "Nifty 200 Screener run envelope, schema v1",
+  "title": "N200 Screener run envelope, schema v1",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -28,7 +28,7 @@
   "properties": {
     "schema_version": { "const": "1" },
     "run_id": { "$ref": "#/$defs/uuidV4" },
-    "universe": { "const": "Nifty 200" },
+    "universe": { "type": "string", "minLength": 2, "maxLength": 80 },
     "universe_validation": { "const": "user_confirmed" },
     "effective_date": { "$ref": "#/$defs/isoDate" },
     "imported_at": { "$ref": "#/$defs/rfc3339Z" },

@@ -1,5 +1,6 @@
 import type { ImportWarning } from '../csv/types';
 import type { VolumeRatioMetric } from '../csv/volumeRatio';
+import type { RunUniverse } from './universe';
 
 export const SCHEMA_VERSION_V1 = '1';
 export const SCHEMA_VERSION_V2 = '2';
@@ -34,7 +35,7 @@ export interface ComputedMetricsV1 {
 export interface RunEnvelopeV1 {
   schema_version: typeof SCHEMA_VERSION_V1;
   run_id: string;
-  universe: 'Nifty 200';
+  universe: RunUniverse;
   universe_validation: 'user_confirmed';
   /** ISO YYYY-MM-DD, user-confirmed at import. */
   effective_date: string;
@@ -104,8 +105,8 @@ export interface ComputedMetricsV2 {
 /** Combined-level warning codes: structural facts about the combined run, distinct from any
  * single source file's own `ImportWarningCode`s (which stay per-part in `source_files[i]`). */
 export const COMBINED_IMPORT_WARNING_CODES = [
-  /** Non-blocking; requires explicit confirmation. Index constituents can legitimately differ
-   * from 200 temporarily, so this never blocks confirmation by itself. */
+  /** Non-blocking; requires explicit confirmation when a selected universe has a known count and
+   * the combined unique count differs. */
   'COMBINED_COUNT_NOT_200',
 ] as const;
 export type CombinedImportWarningCode = (typeof COMBINED_IMPORT_WARNING_CODES)[number];
@@ -126,7 +127,7 @@ export interface CombinedImportWarning {
 export interface RunEnvelopeV2 {
   schema_version: typeof SCHEMA_VERSION_V2;
   run_id: string;
-  universe: 'Nifty 200';
+  universe: RunUniverse;
   universe_validation: 'user_confirmed';
   /** ISO YYYY-MM-DD, user-confirmed at import; one shared date for the whole combined run. */
   effective_date: string;
@@ -137,7 +138,7 @@ export interface RunEnvelopeV2 {
   /** The combined row ordering: source order, then row order within each source. Index-aligned
    * with `computed_metrics.volume_ratio_v1`. */
   combined_row_refs: CombinedRowRefV2[];
-  /** Combined-level warnings only (e.g. "combined count is not 200"); each source file's own
+  /** Combined-level warnings only (e.g. "combined count differs"); each source file's own
    * warnings live in `source_files[i].import_warnings`. */
   import_warnings: CombinedImportWarning[];
   /** Equals `combined_row_refs.length` — total combined row count (mirrors v1's `stock_count`
