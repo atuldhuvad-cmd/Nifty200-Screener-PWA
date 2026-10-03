@@ -53,6 +53,14 @@ describe('buildEnvelope', () => {
     expect(envelope.parser).toMatchObject({ parser_id: 'csv-parse', config_id: 'n200-csv-v1' });
   });
 
+  it('stores the selected universe label', async () => {
+    const envelope = await buildFrom('SYNTHETIC_crlf_final_newline.csv', {
+      universe: 'Nifty Smallcap 500',
+    });
+    expect(envelope.universe).toBe('Nifty Smallcap 500');
+    expect(validateSchema(envelope)).toBe(true);
+  });
+
   it('generates a random UUID v4 run_id when none is supplied', async () => {
     const buildWithoutRunId = async () => {
       const bytes = synthetic('SYNTHETIC_crlf_final_newline.csv');

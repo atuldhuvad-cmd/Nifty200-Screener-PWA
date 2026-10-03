@@ -50,6 +50,10 @@ export interface MultipartWarning {
   uniqueStockCount: number;
 }
 
+export interface MultipartAnalysisOptions {
+  expectedUniqueStockCount?: number;
+}
+
 export interface CombinedRowAnalysis {
   sourceIndex: number;
   sourceRowIndex: number;
@@ -90,7 +94,10 @@ function groupBy<T, K>(items: T[], key: (item: T) => K | null): Map<K, T[]> {
   return map;
 }
 
-export function analyzeMultipartParts(inputs: MultipartPartInput[]): MultipartAnalysis {
+export function analyzeMultipartParts(
+  inputs: MultipartPartInput[],
+  options: MultipartAnalysisOptions = {},
+): MultipartAnalysis {
   const parts: MultipartPartResult[] = inputs.map((input) => ({
     filename: input.filename,
     mimeType: input.mimeType,
@@ -170,7 +177,12 @@ export function analyzeMultipartParts(inputs: MultipartPartInput[]): MultipartAn
   const uniqueStockCount = identityKeys.size;
 
   const warnings: MultipartWarning[] = [];
-  if (uniqueStockCount !== 200) warnings.push({ code: 'COMBINED_COUNT_NOT_200', uniqueStockCount });
+  if (
+    options.expectedUniqueStockCount !== undefined &&
+    uniqueStockCount !== options.expectedUniqueStockCount
+  ) {
+    warnings.push({ code: 'COMBINED_COUNT_NOT_200', uniqueStockCount });
+  }
 
   const combinedRows: CombinedRowAnalysis[] = combined.map(
     ({ sourceIndex, sourceRowIndex, identity, volumeRatio }) => ({

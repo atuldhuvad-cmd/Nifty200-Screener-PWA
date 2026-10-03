@@ -6,6 +6,7 @@
     normalizeForDisplay,
     type DisplayColumn,
   } from '../core/display';
+  import type { RunUniverse } from '../core/envelope';
   import { describeVolumeRatio } from './importMessages';
 
   interface Props {
@@ -13,9 +14,10 @@
     rows: string[][];
     rowAnalyses: RowAnalysis[];
     providerColumnIndex: number | undefined;
+    universe: RunUniverse;
   }
 
-  const { headers, rows, rowAnalyses, providerColumnIndex }: Props = $props();
+  const { headers, rows, rowAnalyses, providerColumnIndex, universe }: Props = $props();
 
   function cell(row: string[], c: number): string {
     return normalizeForDisplay(row[c] ?? '');
@@ -56,8 +58,8 @@
 <div class="table-scroll" role="region" aria-label="CSV preview table" tabindex="0">
   <p class="n200-badge n200-badge--gold">
     Swing checklist is informational only. It does not say Buy, Sell, or Avoid. It does not score
-    stocks, filter automatically, or verify whether the CSV is truly current Nifty 200 beyond what
-    the imported file says.
+    stocks, filter automatically, or verify whether the CSV is truly current {universe} beyond what the
+    imported file says.
   </p>
   <table>
     <caption class="visually-hidden">

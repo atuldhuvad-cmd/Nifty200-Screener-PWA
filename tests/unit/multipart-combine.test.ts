@@ -108,7 +108,9 @@ describe('analyzeMultipartParts: blocking cross-part identity conflicts', () => 
   it('blocks when the same valid ISIN appears in two different parts (overlapping parts)', () => {
     const a = buildCsv([SYNTHETIC_HEADER, rowWith('1', 'Alpha', 'ZZSYNTH00015', 'AAA')]);
     const b = buildCsv([SYNTHETIC_HEADER, rowWith('1', 'Alpha', 'ZZSYNTH00015', 'AAA')]);
-    const result = analyzeMultipartParts([part(a, 'a.csv'), part(b, 'b.csv')]);
+    const result = analyzeMultipartParts([part(a, 'a.csv'), part(b, 'b.csv')], {
+      expectedUniqueStockCount: 200,
+    });
     if (!result.ok)
       throw new Error('expected ok: true (blocking is via overlapErrors, not per-part)');
     expect(result.canConfirm).toBe(false);
@@ -120,7 +122,9 @@ describe('analyzeMultipartParts: blocking cross-part identity conflicts', () => 
   it('blocks "same NSE Code, different valid ISIN"', () => {
     const a = buildCsv([SYNTHETIC_HEADER, rowWith('1', 'Alpha', 'ZZSYNTH00015', 'SHARED')]);
     const b = buildCsv([SYNTHETIC_HEADER, rowWith('1', 'Beta', 'ZZSYNTH00023', 'SHARED')]);
-    const result = analyzeMultipartParts([part(a, 'a.csv'), part(b, 'b.csv')]);
+    const result = analyzeMultipartParts([part(a, 'a.csv'), part(b, 'b.csv')], {
+      expectedUniqueStockCount: 200,
+    });
     if (!result.ok) throw new Error('expected ok: true');
     expect(result.canConfirm).toBe(false);
     expect(result.overlapErrors).toContainEqual(
@@ -131,7 +135,9 @@ describe('analyzeMultipartParts: blocking cross-part identity conflicts', () => 
   it('blocks as ambiguous when NSE Code is the only usable identifier and repeats across parts', () => {
     const a = buildCsv([SYNTHETIC_HEADER, rowWith('1', 'Alpha', '', 'ONLYNSE')]);
     const b = buildCsv([SYNTHETIC_HEADER, rowWith('1', 'Beta', '', 'ONLYNSE')]);
-    const result = analyzeMultipartParts([part(a, 'a.csv'), part(b, 'b.csv')]);
+    const result = analyzeMultipartParts([part(a, 'a.csv'), part(b, 'b.csv')], {
+      expectedUniqueStockCount: 200,
+    });
     if (!result.ok) throw new Error('expected ok: true');
     expect(result.canConfirm).toBe(false);
     expect(result.overlapErrors).toContainEqual(
@@ -146,7 +152,9 @@ describe('analyzeMultipartParts: blocking cross-part identity conflicts', () => 
       rowWith('2', 'Alpha again', 'ZZSYNTH00015', 'AAA'),
     ]);
     const b = buildCsv([SYNTHETIC_HEADER, rowWith('1', 'Beta', 'ZZSYNTH00023', 'BBB')]);
-    const result = analyzeMultipartParts([part(a, 'a.csv'), part(b, 'b.csv')]);
+    const result = analyzeMultipartParts([part(a, 'a.csv'), part(b, 'b.csv')], {
+      expectedUniqueStockCount: 200,
+    });
     if (!result.ok) throw new Error('expected ok: true');
     expect(result.overlapErrors).toEqual([]);
     expect(result.canConfirm).toBe(true);
@@ -163,7 +171,9 @@ describe('analyzeMultipartParts: non-200 combined count warning', () => {
       SYNTHETIC_HEADER,
       ['1', 'Beta', '', '1500', '1000', 'BBB', 'ZZSYNTH00023'],
     ]);
-    const result = analyzeMultipartParts([part(a, 'a.csv'), part(b, 'b.csv')]);
+    const result = analyzeMultipartParts([part(a, 'a.csv'), part(b, 'b.csv')], {
+      expectedUniqueStockCount: 200,
+    });
     if (!result.ok) throw new Error('expected ok: true');
     expect(result.canConfirm).toBe(true); // non-blocking
     expect(result.warnings).toContainEqual({ code: 'COMBINED_COUNT_NOT_200', uniqueStockCount: 2 });

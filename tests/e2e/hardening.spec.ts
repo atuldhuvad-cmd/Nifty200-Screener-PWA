@@ -110,7 +110,7 @@ test.describe('Step 7: oversized input writes nothing', () => {
       // a raw open of a database that does not exist yet would create an empty version-1 one.
       await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
       const before = await storeCounts(page);
-      await page.getByLabel('Choose a Nifty 200 CSV file').setInputFiles({
+      await page.getByLabel('Choose an NSE index CSV file').setInputFiles({
         name: 'oversize.csv',
         mimeType: 'text/csv',
         buffer: make(),
@@ -151,7 +151,7 @@ test.describe('Step 7: privacy of console output', () => {
 test.describe('Step 7: keyboard-only import', () => {
   test('a run can be imported using only the keyboard after choosing a file', async ({ page }) => {
     await page.goto('/');
-    await page.getByLabel('Choose a Nifty 200 CSV file').setInputFiles(FIXTURE_HEADER_ONLY);
+    await page.getByLabel('Choose an NSE index CSV file').setInputFiles(FIXTURE_HEADER_ONLY);
     const date = page.getByLabel('Effective date (required)');
     await date.focus();
     await page.keyboard.type('27092026');

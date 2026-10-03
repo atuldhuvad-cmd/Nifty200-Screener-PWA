@@ -9,6 +9,7 @@ import {
   type ParserProvenanceV1,
   type RunEnvelopeV1,
 } from './types';
+import { DEFAULT_RUN_UNIVERSE, type RunUniverse } from './universe';
 
 // `canConfirm` is a plain `boolean` field on the single `ok: true` variant of CsvAnalysis
 // (not a discriminant with its own literal-typed variants), so it cannot be narrowed via
@@ -27,6 +28,7 @@ export interface BuildEnvelopeInput {
   /** Defaults to `new Date()`. Injectable for deterministic tests. */
   importedAt?: Date;
   queryText?: string;
+  universe?: RunUniverse;
   /** Defaults to `crypto.randomUUID()`. Injectable for deterministic tests. */
   runId?: string;
 }
@@ -67,7 +69,7 @@ export async function buildEnvelope(input: BuildEnvelopeInput): Promise<BuildEnv
   const withoutHash: Omit<RunEnvelopeV1, 'envelope_sha256'> = {
     schema_version: SCHEMA_VERSION_V1,
     run_id: input.runId ?? crypto.randomUUID(),
-    universe: 'Nifty 200',
+    universe: input.universe ?? DEFAULT_RUN_UNIVERSE,
     universe_validation: 'user_confirmed',
     effective_date: input.effectiveDate,
     imported_at: (input.importedAt ?? new Date()).toISOString(),

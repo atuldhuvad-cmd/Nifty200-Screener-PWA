@@ -64,6 +64,7 @@
   );
   const projection = $derived(envelope !== undefined ? projectRunRows(envelope) : undefined);
   const columns = $derived(projection !== undefined ? buildRunTableColumns(projection) : []);
+  const canVerifyNifty200 = $derived(envelope?.universe === 'Nifty 200');
 
   const sortedRows = $derived.by(() => {
     if (projection === undefined) return [];
@@ -216,79 +217,81 @@
       <p>Screener query: {envelope.query_text}</p>
     {/if}
 
-    <section class="data-panel" aria-labelledby="nifty200-verify-heading">
-      <div class="data-panel__head">
-        <div>
-          <p class="eyebrow">Universe check</p>
-          <h3 id="nifty200-verify-heading">Current Nifty 200 membership</h3>
-        </div>
-        <button
-          type="button"
-          class="secondary-button"
-          disabled={verifyingNifty200 || projection.rows.length === 0}
-          onclick={() => {
-            void verifyNifty200Universe();
-          }}
-        >
-          {verifyingNifty200 ? 'Checking…' : 'Fetch NSE list and verify'}
-        </button>
-      </div>
-      <p>
-        This fetches the official Nifty 200 constituents CSV from NSE/Nifty Indices and compares
-        this run by ISIN or NSE Code. Until this check passes, the app only knows what the imported
-        file says.
-      </p>
-      <div class="file-drop">
-        <label for="nifty200-list-file">Or choose the downloaded official NSE list CSV</label>
-        <input
-          id="nifty200-list-file"
-          type="file"
-          accept=".csv,text/csv"
-          disabled={verifyingNifty200 || projection.rows.length === 0}
-          onchange={handleNseListFileChange}
-        />
-        <p>
-          Expected file name: <code>ind_nifty200list.csv</code>. The file is read locally for this
-          check only; it is not stored, synced, or uploaded.
-        </p>
-      </div>
-      {#if nifty200VerificationError}
-        <p role="alert" class="n200-badge n200-badge--warning">{nifty200VerificationError}</p>
-      {:else if nifty200Verification !== undefined}
-        <p
-          role="status"
-          class="n200-badge {nifty200Verification.missingRows.length === 0 &&
-          nifty200Verification.unverifiedRows.length === 0
-            ? 'n200-badge--success'
-            : 'n200-badge--warning'}"
-        >
-          {nifty200Verification.matchedRows}/{nifty200Verification.runRows} rows matched the current official
-          list. Official list rows: {nifty200Verification.constituentCount}. Checked: {nifty200Verification.checkedAt}.
-        </p>
-        {#if nifty200Verification.missingRows.length > 0}
-          <p>Rows not found in the official list:</p>
-          <ul>
-            {#each nifty200Verification.missingRows as row (row.position)}
-              <li>Row {row.position}: {row.identity}</li>
-            {/each}
-          </ul>
-        {/if}
-        {#if nifty200Verification.unverifiedRows.length > 0}
-          <p>Rows that could not be verified:</p>
-          <ul>
-            {#each nifty200Verification.unverifiedRows as row (row.position)}
-              <li>Row {row.position}: {row.reason}</li>
-            {/each}
-          </ul>
-        {/if}
-        <p>
-          Source:
-          <a href={nifty200Verification.sourceUrl} rel="noreferrer" target="_blank"
-            >NSE/Nifty Indices Nifty 200 constituents CSV</a
+    {#if canVerifyNifty200}
+      <section class="data-panel" aria-labelledby="nifty200-verify-heading">
+        <div class="data-panel__head">
+          <div>
+            <p class="eyebrow">Universe check</p>
+            <h3 id="nifty200-verify-heading">Current Nifty 200 membership</h3>
+          </div>
+          <button
+            type="button"
+            class="secondary-button"
+            disabled={verifyingNifty200 || projection.rows.length === 0}
+            onclick={() => {
+              void verifyNifty200Universe();
+            }}
           >
+            {verifyingNifty200 ? 'Checking…' : 'Fetch NSE list and verify'}
+          </button>
+        </div>
+        <p>
+          This fetches the official Nifty 200 constituents CSV from NSE/Nifty Indices and compares
+          this run by ISIN or NSE Code. Until this check passes, the app only knows what the
+          imported file says.
         </p>
-      {/if}
-    </section>
+        <div class="file-drop">
+          <label for="nifty200-list-file">Or choose the downloaded official NSE list CSV</label>
+          <input
+            id="nifty200-list-file"
+            type="file"
+            accept=".csv,text/csv"
+            disabled={verifyingNifty200 || projection.rows.length === 0}
+            onchange={handleNseListFileChange}
+          />
+          <p>
+            Expected file name: <code>ind_nifty200list.csv</code>. The file is read locally for this
+            check only; it is not stored, synced, or uploaded.
+          </p>
+        </div>
+        {#if nifty200VerificationError}
+          <p role="alert" class="n200-badge n200-badge--warning">{nifty200VerificationError}</p>
+        {:else if nifty200Verification !== undefined}
+          <p
+            role="status"
+            class="n200-badge {nifty200Verification.missingRows.length === 0 &&
+            nifty200Verification.unverifiedRows.length === 0
+              ? 'n200-badge--success'
+              : 'n200-badge--warning'}"
+          >
+            {nifty200Verification.matchedRows}/{nifty200Verification.runRows} rows matched the current
+            official list. Official list rows: {nifty200Verification.constituentCount}. Checked: {nifty200Verification.checkedAt}.
+          </p>
+          {#if nifty200Verification.missingRows.length > 0}
+            <p>Rows not found in the official list:</p>
+            <ul>
+              {#each nifty200Verification.missingRows as row (row.position)}
+                <li>Row {row.position}: {row.identity}</li>
+              {/each}
+            </ul>
+          {/if}
+          {#if nifty200Verification.unverifiedRows.length > 0}
+            <p>Rows that could not be verified:</p>
+            <ul>
+              {#each nifty200Verification.unverifiedRows as row (row.position)}
+                <li>Row {row.position}: {row.reason}</li>
+              {/each}
+            </ul>
+          {/if}
+          <p>
+            Source:
+            <a href={nifty200Verification.sourceUrl} rel="noreferrer" target="_blank"
+              >NSE/Nifty Indices Nifty 200 constituents CSV</a
+            >
+          </p>
+        {/if}
+      </section>
+    {/if}
 
     {#if projection.rows.length === 0}
       <p role="status" class="n200-badge n200-badge--warning">
@@ -305,7 +308,7 @@
         </div>
         <p class="n200-badge n200-badge--gold">
           Swing checklist is informational only. It does not say Buy, Sell, or Avoid. It does not
-          score stocks, filter automatically, or verify whether the CSV is truly current Nifty 200
+          score stocks, filter automatically, or verify whether the CSV is truly current {envelope.universe}
           beyond what the imported file says.
         </p>
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->

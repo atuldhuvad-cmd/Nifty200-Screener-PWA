@@ -1,6 +1,11 @@
 <script lang="ts">
   import { analyzeMultipartParts, type MultipartAnalysis } from '../core/csv';
-  import { buildMultipartEnvelope, sha256Hex } from '../core/envelope';
+  import {
+    buildMultipartEnvelope,
+    expectedUniverseCount,
+    sha256Hex,
+    type RunUniverse,
+  } from '../core/envelope';
   import {
     buildSwingChecklistFromCells,
     describeSwingChecklist,
@@ -21,10 +26,12 @@
 
   interface Props {
     db: N200Database;
+    universe: RunUniverse;
+    universeValid: boolean;
     onCommitted: () => void;
   }
 
-  const { db, onCommitted }: Props = $props();
+  const { db, universe, universeValid, onCommitted }: Props = $props();
 
   let fileInputEl: HTMLInputElement | undefined = $state();
   let files: File[] = $state([]);
@@ -48,8 +55,11 @@
   const previewAnalysis = $derived(
     canPreview && okAnalysis !== undefined && okAnalysis.canConfirm ? okAnalysis : undefined,
   );
+  const expectedCount = $derived(expectedUniverseCount(universe));
   const isNon200 = $derived(
-    previewAnalysis !== undefined && previewAnalysis.uniqueStockCount !== 200,
+    previewAnalysis !== undefined &&
+      expectedCount !== undefined &&
+      previewAnalysis.uniqueStockCount !== expectedCount,
   );
   const isPriorImport = $derived(anyPartPreviouslyImported || exactSetPreviouslyImported);
   const effectiveDateValid = $derived(/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate));
@@ -57,6 +67,7 @@
     previewAnalysis !== undefined &&
       effectiveDateValid &&
       attestationChecked &&
+      universeValid &&
       (!isPriorImport || priorImportAck) &&
       (!isNon200 || combinedCountAck) &&
       !committing &&
@@ -109,7 +120,11 @@
         mimeType: file.type,
       })),
     );
-    analysis = analyzeMultipartParts(inputs);
+    const expected = expectedUniverseCount(universe);
+    analysis = analyzeMultipartParts(
+      inputs,
+      expected === undefined ? {} : { expectedUniqueStockCount: expected },
+    );
 
     if (analysis.ok && analysis.canConfirm) {
       checkingDuplicates = true;
@@ -176,6 +191,7 @@
           analysis: capturedAnalysis,
           fileMimeTypes: capturedMimeTypes,
           effectiveDate,
+          universe,
           ...(trimmedQuery !== '' ? { queryText: trimmedQuery } : {}),
         });
         if (!built.ok) {
@@ -225,7 +241,9 @@
       type="file"
       accept=".csv,text/csv"
       multiple
-      aria-describedby={analysis !== undefined && !canPreview ? 'multipart-file-errors' : undefined}
+      aria-describedby={analysis !== undefined && !analysis.ok
+        ? 'multipart-file-errors'
+        : undefined}
       onchange={handleFileChange}
     />
   </div>
@@ -273,7 +291,7 @@
     </ol>
   {/if}
 
-  {#if analysis !== undefined && !canPreview}
+  {#if analysis !== undefined && !analysis.ok}
     <div id="multipart-file-errors" role="alert">
       <p class="n200-badge n200-badge--error">
         This multipart import cannot proceed: at least one file failed to parse or has a blocking
@@ -282,12 +300,16 @@
     </div>
   {/if}
 
-  {#if previewAnalysis !== undefined}
-    {#if previewAnalysis.overlapErrors.length > 0}
+  {#if okAnalysis !== undefined}
+    {#if okAnalysis.overlapErrors.length > 0}
       <div role="alert">
         <p class="n200-badge n200-badge--error">This combination of files cannot be confirmed:</p>
+        <p>
+          Multipart import is only for page 1/page 2/page 3 of the same Trendlyne result. If these
+          are different screeners, import them one at a time.
+        </p>
         <ul>
-          {#each previewAnalysis.overlapErrors as e, i (i)}
+          {#each okAnalysis.overlapErrors as e, i (i)}
             <li>
               {#if e.code === 'DUPLICATE_ISIN_ACROSS_PARTS'}
                 The same ISIN appears in more than one selected file.
@@ -306,14 +328,14 @@
       <div>
         <h3>Combined preview</h3>
         <p>
-          Combined rows: {previewAnalysis.combinedRows.length}. Combined unique stock count: {previewAnalysis.uniqueStockCount}.
+          Combined rows: {okAnalysis.combinedRows.length}. Combined unique stock count: {okAnalysis.uniqueStockCount}.
         </p>
 
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <div class="table-scroll" role="region" aria-label="Combined preview table" tabindex="0">
           <p class="n200-badge n200-badge--gold">
             Swing checklist is informational only. It does not say Buy, Sell, or Avoid. It does not
-            score stocks, filter automatically, or verify whether the CSV is truly current Nifty 200
+            score stocks, filter automatically, or verify whether the CSV is truly current {universe}
             beyond what the imported file says.
           </p>
           <table>
@@ -329,10 +351,10 @@
               </tr>
             </thead>
             <tbody>
-              {#each previewAnalysis.combinedRows as row, i (i)}
+              {#each okAnalysis.combinedRows as row, i (i)}
                 <tr>
                   <th scope="row">{i + 1}</th>
-                  <td>{previewAnalysis.parts[row.sourceIndex]?.filename ?? ''}</td>
+                  <td>{okAnalysis.parts[row.sourceIndex]?.filename ?? ''}</td>
                   <td>{row.sourceRowIndex + 1}</td>
                   <td>
                     {row.identity.match_method === 'isin'
@@ -382,7 +404,7 @@
               required
             />
             <label for="multipart-attestation">
-              I confirm these files together are a Nifty 200 export.
+              I confirm these files together are a {universe} export.
             </label>
           </div>
 
@@ -410,8 +432,8 @@
           {#if isNon200}
             <div role="status">
               <p class="n200-badge n200-badge--warning">
-                The combined unique stock count is {previewAnalysis.uniqueStockCount}, not 200.
-                Index constituents can legitimately differ from 200 temporarily.
+                The combined unique stock count is {okAnalysis.uniqueStockCount}, not {expectedCount}.
+                Index constituents can legitimately differ temporarily.
               </p>
               <input
                 id="multipart-count-ack"
@@ -420,7 +442,7 @@
                 required
               />
               <label for="multipart-count-ack">
-                I confirm I want to commit this run with {previewAnalysis.uniqueStockCount} unique stocks.
+                I confirm I want to commit this run with {okAnalysis.uniqueStockCount} unique stocks.
               </label>
             </div>
           {/if}

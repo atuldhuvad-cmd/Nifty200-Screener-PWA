@@ -13,6 +13,7 @@ import {
   type RunEnvelopeV2,
   type SourceFileV2,
 } from './types';
+import { DEFAULT_RUN_UNIVERSE, type RunUniverse } from './universe';
 
 type OkMultipartAnalysis = Extract<MultipartAnalysis, { ok: true }>;
 
@@ -25,6 +26,7 @@ export interface BuildMultipartEnvelopeInput {
   effectiveDate: string;
   importedAt?: Date;
   queryText?: string;
+  universe?: RunUniverse;
   runId?: string;
 }
 
@@ -93,7 +95,7 @@ export async function buildMultipartEnvelope(
   const withoutHash: Omit<RunEnvelopeV2, 'envelope_sha256'> = {
     schema_version: SCHEMA_VERSION_V2,
     run_id: input.runId ?? crypto.randomUUID(),
-    universe: 'Nifty 200',
+    universe: input.universe ?? DEFAULT_RUN_UNIVERSE,
     universe_validation: 'user_confirmed',
     effective_date: input.effectiveDate,
     imported_at: (input.importedAt ?? new Date()).toISOString(),

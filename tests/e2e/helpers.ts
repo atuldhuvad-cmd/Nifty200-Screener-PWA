@@ -79,7 +79,7 @@ export const FIXTURE_5B_CONFLICT = join(
 );
 
 export async function chooseFile(page: Page, path: string): Promise<void> {
-  await page.getByLabel('Choose a Nifty 200 CSV file').setInputFiles(path);
+  await page.getByLabel('Choose an NSE index CSV file').setInputFiles(path);
 }
 
 export async function fillRequiredFields(page: Page, effectiveDate = '2026-09-27'): Promise<void> {
