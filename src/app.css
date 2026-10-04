@@ -534,6 +534,23 @@ tbody tr:hover {
 
 .run-detail-table th,
 .run-detail-table td {
+  max-width: 14rem;
+  white-space: nowrap;
+}
+
+.run-detail-table tbody th,
+.run-detail-table tbody td {
+  height: 2.3rem;
+  padding: 0;
+  vertical-align: middle;
+}
+
+.run-detail-cell {
+  display: block;
+  max-width: 14rem;
+  padding: 0.45rem var(--space-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

@@ -347,29 +347,31 @@
             <tbody>
               {#each sortedRows as row, i (row.position)}
                 <tr>
-                  <th scope="row">{i + 1}</th>
+                  <th scope="row"><span class="run-detail-cell">{i + 1}</span></th>
                   {#each columns as col (col.key)}
                     <td>
-                      {#if col.role.role === 'sourceFile'}
-                        {row.sourceFilename}
-                      {:else if col.role.role === 'sourceRow'}
-                        {row.sourceRowNumber}
-                      {:else if col.role.role === 'identity'}
-                        {#if identityKeyForIdentity(row.identity) !== null}
-                          <a href={compareHash(identityKeyForIdentity(row.identity))}
-                            >{identityDisplayText(row.identity)}
-                            <span class="visually-hidden">(compare across runs)</span></a
-                          >
+                      <span class="run-detail-cell">
+                        {#if col.role.role === 'sourceFile'}
+                          {row.sourceFilename}
+                        {:else if col.role.role === 'sourceRow'}
+                          {row.sourceRowNumber}
+                        {:else if col.role.role === 'identity'}
+                          {#if identityKeyForIdentity(row.identity) !== null}
+                            <a href={compareHash(identityKeyForIdentity(row.identity))}
+                              >{identityDisplayText(row.identity)}
+                              <span class="visually-hidden">(compare across runs)</span></a
+                            >
+                          {:else}
+                            {identityDisplayText(row.identity)}
+                          {/if}
+                        {:else if col.role.role === 'appVolumeRatio'}
+                          {describeVolumeRatio(row.volumeRatio)}
+                        {:else if col.role.role === 'swingChecklist'}
+                          {summarizeSwingChecklist(buildSwingChecklist(row, projection.columns))}
                         {:else}
-                          {identityDisplayText(row.identity)}
+                          {rawCellDisplayText(row, col.role.columnIndex)}
                         {/if}
-                      {:else if col.role.role === 'appVolumeRatio'}
-                        {describeVolumeRatio(row.volumeRatio)}
-                      {:else if col.role.role === 'swingChecklist'}
-                        {summarizeSwingChecklist(buildSwingChecklist(row, projection.columns))}
-                      {:else}
-                        {rawCellDisplayText(row, col.role.columnIndex)}
-                      {/if}
+                      </span>
                     </td>
                   {/each}
                 </tr>
