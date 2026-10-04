@@ -18,6 +18,7 @@
   };
 
   let plans = $state<Record<string, TradePlan>>({});
+  let paperTradeOpen = $state<Record<string, boolean>>({});
 
   const requiredChecks = ['Price above SMA20', 'RSI 50–70', 'MACD above signal'];
   const confirmationChecks = [
@@ -61,6 +62,10 @@
       ...(plans[key] ?? { status: 'waitlist', entryLow: '', entryHigh: '', stopLoss: '' }),
       [field]: value,
     };
+  }
+
+  function openPaperTrade(key: string): void {
+    paperTradeOpen[key] = true;
   }
 
   function candidateStatus(candidate: CandidateReviewCandidate): TradeStatus {
@@ -184,45 +189,51 @@
                   ? recommendation.reasons.join(', ')
                   : 'required technical conditions are not all met'}.
               </p>
-              <div class="trade-plan">
-                <label
-                  >Status <select
-                    value={plan?.status ?? 'waitlist'}
-                    onchange={(event) => updatePlan(candidate.key, 'status', event)}
-                    ><option value="waitlist">Waitlist</option><option value="buy"
-                      >Buy candidate</option
-                    ></select
-                  ></label
-                >
-                <label
-                  >Entry low <input
-                    inputmode="decimal"
-                    value={plan?.entryLow ?? ''}
-                    onchange={(event) => updatePlan(candidate.key, 'entryLow', event)}
-                  /></label
-                >
-                <label
-                  >Entry high <input
-                    inputmode="decimal"
-                    value={plan?.entryHigh ?? ''}
-                    onchange={(event) => updatePlan(candidate.key, 'entryHigh', event)}
-                  /></label
-                >
-                <label
-                  >Stop loss <input
-                    inputmode="decimal"
-                    value={plan?.stopLoss ?? ''}
-                    onchange={(event) => updatePlan(candidate.key, 'stopLoss', event)}
-                  /></label
-                >
-                {#if numbers}
-                  <p class="trade-plan-result">
-                    Quantity: <strong>{numbers.quantity}</strong> · Max loss:
-                    <strong>₹{numbers.riskAmount.toFixed(2)}</strong>
-                    · 2:1 target: <strong>₹{numbers.target.toFixed(2)}</strong>
-                  </p>
-                {/if}
-              </div>
+              {#if paperTradeOpen[candidate.key] === true}
+                <div class="trade-plan">
+                  <label
+                    >Status <select
+                      value={plan?.status ?? 'waitlist'}
+                      onchange={(event) => updatePlan(candidate.key, 'status', event)}
+                      ><option value="waitlist">Waitlist</option><option value="buy"
+                        >Buy candidate</option
+                      ></select
+                    ></label
+                  >
+                  <label
+                    >Entry low <input
+                      inputmode="decimal"
+                      value={plan?.entryLow ?? ''}
+                      onchange={(event) => updatePlan(candidate.key, 'entryLow', event)}
+                    /></label
+                  >
+                  <label
+                    >Entry high <input
+                      inputmode="decimal"
+                      value={plan?.entryHigh ?? ''}
+                      onchange={(event) => updatePlan(candidate.key, 'entryHigh', event)}
+                    /></label
+                  >
+                  <label
+                    >Stop loss <input
+                      inputmode="decimal"
+                      value={plan?.stopLoss ?? ''}
+                      onchange={(event) => updatePlan(candidate.key, 'stopLoss', event)}
+                    /></label
+                  >
+                  {#if numbers}
+                    <p class="trade-plan-result">
+                      Quantity: <strong>{numbers.quantity}</strong> · Max loss:
+                      <strong>₹{numbers.riskAmount.toFixed(2)}</strong>
+                      · 2:1 target: <strong>₹{numbers.target.toFixed(2)}</strong>
+                    </p>
+                  {/if}
+                </div>
+              {:else}
+                <button type="button" onclick={() => openPaperTrade(candidate.key)}>
+                  Paper Trade
+                </button>
+              {/if}
               <p>Technical checks from the Technical Only run:</p>
               <ul class="candidate-checks">
                 {#each candidate.technicalChecks as check (check.label)}
@@ -268,45 +279,51 @@
                   ? recommendation.reasons.join(', ')
                   : 'required technical conditions are not all met'}.
               </p>
-              <div class="trade-plan">
-                <label
-                  >Status <select
-                    value={plan?.status ?? 'waitlist'}
-                    onchange={(event) => updatePlan(candidate.key, 'status', event)}
-                    ><option value="waitlist">Waitlist</option><option value="buy"
-                      >Buy candidate</option
-                    ></select
-                  ></label
-                >
-                <label
-                  >Entry low <input
-                    inputmode="decimal"
-                    value={plan?.entryLow ?? ''}
-                    onchange={(event) => updatePlan(candidate.key, 'entryLow', event)}
-                  /></label
-                >
-                <label
-                  >Entry high <input
-                    inputmode="decimal"
-                    value={plan?.entryHigh ?? ''}
-                    onchange={(event) => updatePlan(candidate.key, 'entryHigh', event)}
-                  /></label
-                >
-                <label
-                  >Stop loss <input
-                    inputmode="decimal"
-                    value={plan?.stopLoss ?? ''}
-                    onchange={(event) => updatePlan(candidate.key, 'stopLoss', event)}
-                  /></label
-                >
-                {#if numbers}
-                  <p class="trade-plan-result">
-                    Quantity: <strong>{numbers.quantity}</strong> · Max loss:
-                    <strong>₹{numbers.riskAmount.toFixed(2)}</strong>
-                    · 2:1 target: <strong>₹{numbers.target.toFixed(2)}</strong>
-                  </p>
-                {/if}
-              </div>
+              {#if paperTradeOpen[candidate.key] === true}
+                <div class="trade-plan">
+                  <label
+                    >Status <select
+                      value={plan?.status ?? 'waitlist'}
+                      onchange={(event) => updatePlan(candidate.key, 'status', event)}
+                      ><option value="waitlist">Waitlist</option><option value="buy"
+                        >Buy candidate</option
+                      ></select
+                    ></label
+                  >
+                  <label
+                    >Entry low <input
+                      inputmode="decimal"
+                      value={plan?.entryLow ?? ''}
+                      onchange={(event) => updatePlan(candidate.key, 'entryLow', event)}
+                    /></label
+                  >
+                  <label
+                    >Entry high <input
+                      inputmode="decimal"
+                      value={plan?.entryHigh ?? ''}
+                      onchange={(event) => updatePlan(candidate.key, 'entryHigh', event)}
+                    /></label
+                  >
+                  <label
+                    >Stop loss <input
+                      inputmode="decimal"
+                      value={plan?.stopLoss ?? ''}
+                      onchange={(event) => updatePlan(candidate.key, 'stopLoss', event)}
+                    /></label
+                  >
+                  {#if numbers}
+                    <p class="trade-plan-result">
+                      Quantity: <strong>{numbers.quantity}</strong> · Max loss:
+                      <strong>₹{numbers.riskAmount.toFixed(2)}</strong>
+                      · 2:1 target: <strong>₹{numbers.target.toFixed(2)}</strong>
+                    </p>
+                  {/if}
+                </div>
+              {:else}
+                <button type="button" onclick={() => openPaperTrade(candidate.key)}>
+                  Paper Trade
+                </button>
+              {/if}
               <p>These stocks passed the Technical Only screen but not the Balanced screen.</p>
               <ul class="candidate-checks">
                 {#each candidate.technicalChecks as check (check.label)}

@@ -43,10 +43,15 @@ export async function commitNewRun(
     await tx.done;
     return { ok: true, run_id: envelope.run_id };
   } catch (e) {
-    // A failed request (e.g. the ConstraintError below) already auto-aborts the native
-    // transaction per spec; a JS error *between* requests would not, so this is best-effort.
+    // A failed request already auto-aborts the native transaction per spec; a JS error
+    // *between* requests would not, so this is best-effort. Only report a run-ID collision
+    // when that run key is actually present; other IndexedDB constraint failures should surface
+    // as ordinary save failures instead of a misleading random-ID message.
     safeAbort(tx);
-    if (isConstraintError(e)) return { ok: false, reason: 'run_id_collision' };
+    if (isConstraintError(e)) {
+      const existing = await db.get(STORE.runs, envelope.run_id);
+      if (existing !== undefined) return { ok: false, reason: 'run_id_collision' };
+    }
     throw e;
   }
 }
