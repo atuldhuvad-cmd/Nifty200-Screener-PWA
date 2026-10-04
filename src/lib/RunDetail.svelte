@@ -251,7 +251,8 @@
           />
           <p>
             Expected file name: <code>ind_nifty200list.csv</code>. The file is read locally for this
-            check only; it is not stored, synced, or uploaded.
+            check only; it is not stored, synced, or uploaded. The fetch request goes to
+            niftyindices.com.
           </p>
         </div>
         {#if nifty200VerificationError}

@@ -22,6 +22,7 @@
     describeImportError,
     describeImportWarning,
     describeVolumeRatio,
+    RUN_ID_COLLISION_MESSAGE,
   } from './importMessages';
 
   interface Props {
@@ -215,8 +216,7 @@
         cancel();
         successMessage = message;
       } else if (lastReason === 'run_id_collision') {
-        commitError =
-          'Could not generate a unique run ID after several attempts. Please try again.';
+        commitError = RUN_ID_COLLISION_MESSAGE;
       }
     } catch {
       commitError =
