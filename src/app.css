@@ -527,6 +527,16 @@ tbody tr:hover {
   background: var(--color-accent-bg);
 }
 
+.run-detail-table {
+  width: max-content;
+  min-width: 100%;
+}
+
+.run-detail-table th,
+.run-detail-table td {
+  white-space: nowrap;
+}
+
 tr:last-child > td,
 tr:last-child > th {
   border-bottom: none;

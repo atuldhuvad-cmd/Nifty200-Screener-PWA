@@ -313,8 +313,13 @@
           beyond what the imported file says.
         </p>
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-        <div class="table-scroll" role="region" aria-label="Run stock table" tabindex="0">
-          <table>
+        <div
+          class="table-scroll table-scroll--run-detail"
+          role="region"
+          aria-label="Run stock table"
+          tabindex="0"
+        >
+          <table class="run-detail-table">
             <caption class="visually-hidden">
               Full stock table for the run effective {envelope.effective_date}, {projection.rows
                 .length} rows. Column headers are sortable.
