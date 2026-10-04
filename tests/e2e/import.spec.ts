@@ -147,4 +147,19 @@ test.describe('Step 4 import flow', () => {
     const runsTable = page.locator('table', { hasText: 'Sync state' });
     await expect(runsTable.getByRole('cell', { name: '0', exact: true })).toBeVisible();
   });
+
+  test('6. selected universe controls the single-file confirmation label', async ({ page }) => {
+    await page.goto('/');
+    await page.getByLabel('Index universe').selectOption('Nifty 500');
+    await chooseFile(page, SAMPLE_SEVEN_ROW);
+
+    await expect(page.getByLabel('I confirm this file is a Nifty 500 export.')).toBeVisible();
+    await expect(page.getByLabel('I confirm this file is a Nifty 200 export.')).toHaveCount(0);
+
+    await fillRequiredFields(page, '2026-09-27', 'Nifty 500');
+    await confirmImport(page);
+
+    const runsTable = page.locator('table', { hasText: 'Sync state' });
+    await expect(runsTable.getByRole('cell', { name: 'Nifty 500', exact: true })).toBeVisible();
+  });
 });

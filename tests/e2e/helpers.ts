@@ -82,9 +82,13 @@ export async function chooseFile(page: Page, path: string): Promise<void> {
   await page.getByLabel('Choose an NSE index CSV file').setInputFiles(path);
 }
 
-export async function fillRequiredFields(page: Page, effectiveDate = '2026-09-27'): Promise<void> {
+export async function fillRequiredFields(
+  page: Page,
+  effectiveDate = '2026-09-27',
+  universe = 'Nifty 200',
+): Promise<void> {
   await page.getByLabel('Effective date (required)').fill(effectiveDate);
-  await page.getByLabel('I confirm this file is a Nifty 200 export.').check();
+  await page.getByLabel(`I confirm this file is a ${universe} export.`).check();
 }
 
 export async function confirmImport(page: Page): Promise<void> {
@@ -102,9 +106,10 @@ export async function chooseMultipartFiles(page: Page, paths: string[]): Promise
 export async function fillMultipartRequiredFields(
   page: Page,
   effectiveDate = '2026-09-27',
+  universe = 'Nifty 200',
 ): Promise<void> {
   await page.getByLabel('Effective date (required)').fill(effectiveDate);
-  await page.getByLabel('I confirm these files together are a Nifty 200 export.').check();
+  await page.getByLabel(`I confirm these files together are a ${universe} export.`).check();
 }
 
 export async function confirmMultipartImport(page: Page): Promise<void> {
