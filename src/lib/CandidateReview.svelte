@@ -63,6 +63,24 @@
     };
   }
 
+  function candidateStatus(candidate: CandidateReviewCandidate): TradeStatus {
+    return plans[candidate.key]?.status ?? paperRecommendation(candidate).status;
+  }
+
+  function sortCandidates(
+    candidates: readonly CandidateReviewCandidate[],
+  ): CandidateReviewCandidate[] {
+    return [...candidates].sort((a, b) => {
+      const aStatus = candidateStatus(a);
+      const bStatus = candidateStatus(b);
+      if (aStatus !== bStatus) return aStatus === 'buy' ? -1 : 1;
+      return a.stock.localeCompare(b.stock);
+    });
+  }
+
+  const sortedOverlap = $derived(sortCandidates(review.overlap));
+  const sortedTechnicalOnly = $derived(sortCandidates(review.technicalOnly));
+
   function tradeNumbers(candidate: CandidateReviewCandidate): {
     quantity: number;
     riskAmount: number;
@@ -149,7 +167,7 @@
         <p>No overlap was found.</p>
       {:else}
         <div class="candidate-list">
-          {#each review.overlap as candidate (candidate.key)}
+          {#each sortedOverlap as candidate (candidate.key)}
             {@const plan = plans[candidate.key]}
             {@const numbers = tradeNumbers(candidate)}
             {@const recommendation = paperRecommendation(candidate)}
@@ -233,7 +251,7 @@
         <p>No additional Technical Only candidates were found.</p>
       {:else}
         <div class="candidate-list">
-          {#each review.technicalOnly as candidate (candidate.key)}
+          {#each sortedTechnicalOnly as candidate (candidate.key)}
             {@const plan = plans[candidate.key]}
             {@const numbers = tradeNumbers(candidate)}
             {@const recommendation = paperRecommendation(candidate)}

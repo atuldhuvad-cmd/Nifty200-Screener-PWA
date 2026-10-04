@@ -31,6 +31,7 @@ export {
   buildSwingChecklist,
   buildSwingChecklistFromCells,
   describeSwingChecklist,
+  summarizeSwingChecklist,
   SWING_CSV_PARAMETERS,
 } from './swingCriteria';
 export type { SwingChecklist, SwingCriterionResult, SwingCsvParameter } from './swingCriteria';
