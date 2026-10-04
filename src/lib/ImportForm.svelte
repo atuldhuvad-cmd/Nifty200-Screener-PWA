@@ -7,7 +7,11 @@
     withActivity,
     type N200Database,
   } from '../core/storage';
-  import { describeImportError, describeImportWarning } from './importMessages';
+  import {
+    describeImportError,
+    describeImportWarning,
+    RUN_ID_COLLISION_MESSAGE,
+  } from './importMessages';
   import PreviewTable from './PreviewTable.svelte';
 
   interface Props {
@@ -175,8 +179,7 @@
         cancel();
         successMessage = message;
       } else if (lastReason === 'run_id_collision') {
-        commitError =
-          'Could not generate a unique run ID after several attempts. Please try again.';
+        commitError = RUN_ID_COLLISION_MESSAGE;
       }
     } catch {
       commitError =

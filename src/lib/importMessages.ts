@@ -40,6 +40,10 @@ const WARNING_MESSAGES: Record<ImportWarningCode, string> = {
   EMPTY_RUN: 'This file has a header row but no data rows.',
 };
 
+/** Shown only after every generated run key was reported as already stored. */
+export const RUN_ID_COLLISION_MESSAGE =
+  'This run already exists in this browser. Reload the app and check Run history before trying again.';
+
 function withField(message: string, field?: string): string {
   return field ? `${message} (field: ${field})` : message;
 }
