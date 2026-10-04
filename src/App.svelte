@@ -44,7 +44,12 @@
 
   type ImportMode = 'single' | 'multipart';
   let importMode = $state<ImportMode>('single');
-  let universeInput = $state(DEFAULT_RUN_UNIVERSE);
+  const CUSTOM_UNIVERSE = '__custom__';
+  let universePreset = $state<RunUniverse | typeof CUSTOM_UNIVERSE>(DEFAULT_RUN_UNIVERSE);
+  let customUniverseInput = $state('');
+  const universeInput = $derived(
+    universePreset === CUSTOM_UNIVERSE ? customUniverseInput : universePreset,
+  );
   const selectedUniverse = $derived<RunUniverse>(normalizeRunUniverse(universeInput));
   const universeValid = $derived(isRunUniverseValid(selectedUniverse));
 
@@ -219,20 +224,27 @@
 
               <div>
                 <label for="run-universe">Index universe</label>
-                <input
+                <select
                   id="run-universe"
-                  list="run-universe-options"
-                  bind:value={universeInput}
+                  bind:value={universePreset}
                   aria-describedby="run-universe-help"
-                />
-                <datalist id="run-universe-options">
+                >
                   {#each RUN_UNIVERSES as universe (universe)}
-                    <option value={universe}></option>
+                    <option value={universe}>{universe}</option>
                   {/each}
-                  <option value="All Stocks"></option>
-                </datalist>
+                  <option value={CUSTOM_UNIVERSE}>Custom universe…</option>
+                </select>
+                {#if universePreset === CUSTOM_UNIVERSE}
+                  <label for="run-universe-custom">Custom universe name</label>
+                  <input
+                    id="run-universe-custom"
+                    bind:value={customUniverseInput}
+                    placeholder="Example: NSE All Stocks"
+                    aria-describedby="run-universe-help"
+                  />
+                {/if}
                 <p id="run-universe-help">
-                  Examples: Nifty 50, Nifty 500, Nifty Midcap 100, Nifty Smallcap 500, All Stocks.
+                  Select a preset or choose Custom universe for another NSE/Trendlyne universe.
                 </p>
                 {#if !universeValid}
                   <p role="alert" class="n200-badge n200-badge--error">

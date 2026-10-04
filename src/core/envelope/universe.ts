@@ -7,10 +7,12 @@ export const RUN_UNIVERSES = [
   'Nifty Midcap 50',
   'Nifty Midcap 100',
   'Nifty Midcap 150',
+  'Nifty Midcap 250',
   'Nifty Smallcap 100',
   'Nifty Smallcap 250',
   'Nifty Smallcap 500',
   'Nifty LargeMidcap 250',
+  'All Stocks',
 ] as const satisfies readonly string[];
 
 export type RunUniverse = string;
