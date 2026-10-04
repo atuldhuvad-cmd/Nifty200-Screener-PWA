@@ -251,3 +251,28 @@ Still open:
 | Second-account mismatch on the hosted origin | **NOT TESTED** |
 | Old direct-upload Pages project (`n200-screener`, created 2026-10-01 by `wrangler pages deploy` from a local build of the same commit): keep or delete | **OPEN** (owner decision; nothing deleted) |
 
+
+### 9b. Production smoke test after PR #32 (read-only, browser, 2026-10-04)
+
+Fresh browser profile; read-only except for committing the test imports into the local browser store. No stock names, rows or CSV values recorded. No Google Drive used.
+
+| Check | State | Evidence |
+| ----- | ----- | -------- |
+| App version | **PASS** | `N200 Screener v1.1.0` shown at `https://n200-screener-git.pages.dev` |
+| Test A: Balanced import (Nifty 500) | **PASS** | Committed, effective date 2026-10-03, 30 stocks; no unique-run-ID error |
+| Test A: Technical Only import (Nifty 500) | **PASS** | Committed, effective date 2026-10-03, 38 stocks; no unique-run-ID error |
+| Test A: Run history | **PASS** | Both 2026-10-03 Nifty 500 runs listed |
+| Test A: Paper Trade fields hidden before click | **PASS** | Entry low, Entry high and Stop loss absent before clicking Paper Trade |
+| Test A: Paper Trade reveals fields for one stock | **PASS** | After one Paper Trade click, the three fields appeared once each (clicked stock only) |
+| Test A: Buy candidate before Waitlist | **PASS** | In "In both screens", all Buy candidate rows precede Waitlist rows |
+| Test B: Total market Technical Only import (All Stocks) | **PASS** | Committed, effective date 2026-10-03, 57 stocks; no unique-run-ID error |
+| Test B: Run history label | **PASS** | New 2026-10-03 run listed with universe `All Stocks` |
+| Candidate review completeness from Technical-only file | **NOT TESTED** | Not expected from a Technical-only file (needs Balanced and Technical) |
+| Visible padding or gap issues | **PASS** | None noticed in text and structure checks; no visual review done |
+| Temporary CSV copies | **PASS** | Deleted from the working tree after testing |
+
+Still open (non-blocking):
+
+| Item | State |
+| ---- | ----- |
+| Preview row count vs committed stock count for Technical files (N500 Technical: preview 39, committed 38; total market Technical: preview 59, committed 57). Inspect whether the preview count wording differs from the committed unique-stock count. Not proven data loss. | **OPEN** |

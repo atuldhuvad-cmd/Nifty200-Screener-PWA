@@ -130,11 +130,11 @@
     {#if db && !initError}
       <nav class="app-nav" aria-label="Main">
         <a href="#/" aria-current={onHome ? 'page' : undefined}>Run history</a>
-        <a href={compareHash()} aria-current={compareRoute !== null ? 'page' : undefined}
-          >Compare stocks</a
-        >
         <a href={candidateReviewHash()} aria-current={onCandidateReviewRoute ? 'page' : undefined}
           >Candidate review</a
+        >
+        <a href={compareHash()} aria-current={compareRoute !== null ? 'page' : undefined}
+          >Compare stocks</a
         >
         <a href={backupHash()} aria-current={onBackupRoute ? 'page' : undefined}>Backup</a>
         <a href={reviewHash()} aria-current={onReviewRoute ? 'page' : undefined}>Needs review</a>
