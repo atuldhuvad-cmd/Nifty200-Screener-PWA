@@ -252,3 +252,10 @@ export function describeSwingChecklist(checklist: SwingChecklist): string {
   if (missing.length > 0) parts.push(`Missing: ${missing.join(', ')}`);
   return parts.join(' · ');
 }
+
+export function summarizeSwingChecklist(checklist: SwingChecklist): string {
+  if (checklist.passed === 0 && checklist.failed === 0) return 'No checklist data';
+  return `${String(checklist.passed)}/${String(checklist.total)} met; ${String(
+    checklist.failed,
+  )} failed; ${String(checklist.missing)} missing`;
+}

@@ -3,6 +3,7 @@ import type { ParseConfig } from '../csv/parse';
 import { encodeBase64 } from './base64';
 import { jcsSha256Hex } from './canonicalHash';
 import { sha256Hex } from './hash';
+import { createRunId } from './runId';
 import {
   ENVELOPE_HASH_ALGORITHM,
   SCHEMA_VERSION_V2,
@@ -94,7 +95,7 @@ export async function buildMultipartEnvelope(
 
   const withoutHash: Omit<RunEnvelopeV2, 'envelope_sha256'> = {
     schema_version: SCHEMA_VERSION_V2,
-    run_id: input.runId ?? crypto.randomUUID(),
+    run_id: input.runId ?? createRunId(),
     universe: input.universe ?? DEFAULT_RUN_UNIVERSE,
     universe_validation: 'user_confirmed',
     effective_date: input.effectiveDate,

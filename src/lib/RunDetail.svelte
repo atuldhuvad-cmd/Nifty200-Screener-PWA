@@ -7,7 +7,7 @@
     rawCellDisplayText,
     sortByColumn,
     buildSwingChecklist,
-    describeSwingChecklist,
+    summarizeSwingChecklist,
     type SortDirection,
   } from '../core/display';
   import type { RunEnvelopeV1, RunEnvelopeV2 } from '../core/envelope';
@@ -360,7 +360,7 @@
                       {:else if col.role.role === 'appVolumeRatio'}
                         {describeVolumeRatio(row.volumeRatio)}
                       {:else if col.role.role === 'swingChecklist'}
-                        {describeSwingChecklist(buildSwingChecklist(row, projection.columns))}
+                        {summarizeSwingChecklist(buildSwingChecklist(row, projection.columns))}
                       {:else}
                         {rawCellDisplayText(row, col.role.columnIndex)}
                       {/if}
