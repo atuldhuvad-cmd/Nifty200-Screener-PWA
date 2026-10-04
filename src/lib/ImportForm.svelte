@@ -179,7 +179,8 @@
           'Could not generate a unique run ID after several attempts. Please try again.';
       }
     } catch {
-      commitError = 'Something went wrong while committing this run. Please try again.';
+      commitError =
+        'The browser database rejected this import while saving. Reload the app and try again; existing runs were not changed.';
     } finally {
       committing = false;
     }
